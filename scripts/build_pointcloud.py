@@ -6,6 +6,7 @@ import argparse
 from pathlib import Path
 
 from lsfm_cell_mapping.pointcloud import build_pointcloud_from_masks
+from lsfm_cell_mapping.utils import load_toml_config, require_config_value
 
 
 def parse_args() -> argparse.Namespace:
@@ -15,41 +16,9 @@ def parse_args() -> argparse.Namespace:
         description="Build a canonical seg_num,row,col,slice point-cloud CSV from Cellpose masks."
     )
     parser.add_argument(
-        "--mask-dir",
+        "--config",
         required=True,
-        help="Directory containing Cellpose mask images such as masks_*.tif",
-    )
-    parser.add_argument(
-        "--out-dir",
-        required=True,
-        help="Directory where the canonical point-cloud CSV will be written.",
-    )
-    parser.add_argument(
-        "--pattern",
-        default="masks_*.tif*",
-        help="Glob pattern used to identify mask images.",
-    )
-    parser.add_argument(
-        "--slice-start",
-        type=int,
-        default=1,
-        help="Starting value for sequential slice numbering.",
-    )
-    parser.add_argument(
-        "--zero-based",
-        action="store_true",
-        help="Export row/col coordinates as 0-based instead of 1-based.",
-    )
-    parser.add_argument(
-        "--output-name",
-        default="pointcloud.csv",
-        help="Filename for the exported canonical CSV.",
-    )
-    parser.add_argument(
-        "--max-workers",
-        type=int,
-        default=1,
-        help="Number of worker processes to use for slice-wise centroid extraction.",
+        help="Path to a TOML config file.",
     )
     return parser.parse_args()
 
@@ -58,14 +27,26 @@ def main() -> int:
     """Build a point-cloud CSV from a directory of Cellpose masks."""
 
     args = parse_args()
+    config = load_toml_config(Path(args.config))
+
+    mask_dir = Path(require_config_value(config, "input", "mask_dir"))
+    pattern = config.get("input", {}).get("pattern", "masks_*.tif*")
+
+    out_dir = Path(require_config_value(config, "output", "out_dir"))
+    output_name = config.get("output", {}).get("output_name", "pointcloud.csv")
+
+    slice_start = int(config.get("processing", {}).get("slice_start", 1))
+    one_based = bool(config.get("processing", {}).get("one_based", True))
+    max_workers = int(config.get("processing", {}).get("max_workers", 1))
+
     build_pointcloud_from_masks(
-        mask_dir=Path(args.mask_dir),
-        out_dir=Path(args.out_dir),
-        pattern=args.pattern,
-        slice_start=args.slice_start,
-        one_based=not args.zero_based,
-        max_workers=args.max_workers,
-        output_name=args.output_name,
+        mask_dir=mask_dir,
+        out_dir=out_dir,
+        pattern=pattern,
+        slice_start=slice_start,
+        one_based=one_based,
+        max_workers=max_workers,
+        output_name=output_name,
     )
     return 0
 

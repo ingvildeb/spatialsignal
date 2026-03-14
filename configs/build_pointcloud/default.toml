@@ -1,12 +1,12 @@
 [input]
-mask_dir = "path/to/_02_ml_result/ch1"
+mask_dir = 'Z:\LSFM\2025\2025_03\2025_03_27\20250327_10_26_10_IEB_IEB0012_M_P14_MOBP_LAS_488GFP_561Bg_640Sytox_4x_5umstep_Destripe_DONE\archive\_02_ml_result\ch0'
 pattern = "masks_*.tif*"
 
 [output]
-out_dir = "path/to/output"
-write_centroid_images = true
-write_float_centroids = false
+out_dir = 'C:\Users\SmartBrain_32C_TR\Documents\GitHub\standard_test_data\lsfm_cell_mapping\build_pointcloud\python'
+output_name = "pointcloud.csv"
 
 [processing]
-sort = "natural"
 slice_start = 1
+one_based = true
+max_workers = 8
