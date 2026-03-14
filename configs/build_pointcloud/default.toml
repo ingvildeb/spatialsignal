@@ -1,0 +1,12 @@
+[input]
+mask_dir = "path/to/_02_ml_result/ch1"
+pattern = "masks_*.tif*"
+
+[output]
+out_dir = "path/to/output"
+write_centroid_images = true
+write_float_centroids = false
+
+[processing]
+sort = "natural"
+slice_start = 1
