@@ -38,6 +38,9 @@ def main() -> int:
     slice_start = int(config.get("processing", {}).get("slice_start", 1))
     one_based = bool(config.get("processing", {}).get("one_based", True))
     max_workers = int(config.get("processing", {}).get("max_workers", 1))
+    show_progress = bool(config.get("processing", {}).get("show_progress", True))
+    progress_interval = int(config.get("processing", {}).get("progress_interval", 25))
+    write_qc_images = bool(config.get("qc", {}).get("write_centroid_images", False))
 
     build_pointcloud_from_masks(
         mask_dir=mask_dir,
@@ -47,6 +50,9 @@ def main() -> int:
         one_based=one_based,
         max_workers=max_workers,
         output_name=output_name,
+        write_qc_images=write_qc_images,
+        show_progress=show_progress,
+        progress_interval=progress_interval,
     )
     return 0
 

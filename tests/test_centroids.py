@@ -10,6 +10,7 @@ from lsfm_cell_mapping.pointcloud import (
     extract_centroids_from_mask_stack,
     matlab_round,
 )
+from lsfm_cell_mapping.qc import pointcloud_slice_to_image
 
 
 def test_matlab_round_matches_expected_half_up_behavior() -> None:
@@ -91,3 +92,25 @@ def test_extract_centroids_from_mask_stack_uses_slice_order(tmp_path: Path) -> N
     )
 
     pd.testing.assert_frame_equal(pointcloud.reset_index(drop=True), expected)
+
+
+def test_pointcloud_slice_to_image_marks_expected_pixels() -> None:
+    slice_points = pd.DataFrame(
+        [
+            {"seg_num": 1, "row": 1, "col": 3, "slice": 1},
+            {"seg_num": 2, "row": 3, "col": 2, "slice": 1},
+        ]
+    )
+
+    image = pointcloud_slice_to_image(slice_points, (3, 3), one_based=True)
+
+    expected = np.array(
+        [
+            [0, 0, 255],
+            [0, 0, 0],
+            [0, 255, 0],
+        ],
+        dtype=np.uint8,
+    )
+
+    np.testing.assert_array_equal(image, expected)

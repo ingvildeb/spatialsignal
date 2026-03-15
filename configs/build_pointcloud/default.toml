@@ -10,3 +10,8 @@ output_name = "pointcloud.csv"
 slice_start = 1
 one_based = true
 max_workers = 8
+show_progress = true
+progress_interval = 25
+
+[qc]
+write_centroid_images = true
