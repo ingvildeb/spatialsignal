@@ -7,6 +7,7 @@ from .centroids import (
     extract_centroids_from_mask_stack,
     matlab_round,
 )
+from .metadata import build_pointcloud_space_metadata, write_pointcloud_space_metadata
 from .validate import (
     ValidationReport,
     compare_pointcloud_tables,
@@ -19,6 +20,7 @@ __all__ = [
     "build_pointcloud_from_masks",
     "POINTCLOUD_COLUMNS",
     "ValidationReport",
+    "build_pointcloud_space_metadata",
     "compare_pointcloud_tables",
     "extract_centroids_from_mask",
     "extract_centroids_from_mask_stack",
@@ -26,4 +28,5 @@ __all__ = [
     "load_legacy_matlab_centroids_csv",
     "matlab_round",
     "relabel_slices_in_natural_order",
+    "write_pointcloud_space_metadata",
 ]

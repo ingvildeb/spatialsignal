@@ -6,6 +6,7 @@ import tifffile
 
 from lsfm_cell_mapping.pointcloud import (
     POINTCLOUD_COLUMNS,
+    build_pointcloud_from_masks,
     extract_centroids_from_mask,
     extract_centroids_from_mask_stack,
     matlab_round,
@@ -114,3 +115,32 @@ def test_pointcloud_slice_to_image_marks_expected_pixels() -> None:
     )
 
     np.testing.assert_array_equal(image, expected)
+
+
+def test_build_pointcloud_from_masks_writes_csv_and_space_json(tmp_path: Path) -> None:
+    mask_dir = tmp_path / "masks"
+    out_dir = tmp_path / "out"
+    mask_dir.mkdir()
+
+    mask = np.array(
+        [
+            [0, 1, 1],
+            [0, 0, 0],
+            [2, 2, 0],
+        ],
+        dtype=np.uint16,
+    )
+    tifffile.imwrite(mask_dir / "masks_1.tif", mask)
+
+    build_pointcloud_from_masks(
+        mask_dir=mask_dir,
+        out_dir=out_dir,
+        subject_name="Test Subject",
+        space_name="subject_space",
+        orientation="sal",
+        resolution_um=[5.0, 1.8, 1.8],
+        max_workers=1,
+    )
+
+    assert (out_dir / "Test_Subject_pointcloud.csv").exists()
+    assert (out_dir / "Test_Subject_pointcloud_space.json").exists()

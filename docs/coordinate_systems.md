@@ -10,7 +10,8 @@ The canonical point-cloud table for milestone 1 uses the following columns:
 - `slice`: sequential slice index assigned from the natural sort order of mask files
 
 These coordinates describe image-space positions only. They do not yet encode
-anatomical orientation, atlas alignment, or physical units.
+anatomical orientation directly in the table itself. Instead, those properties should
+be recorded in a point-cloud space metadata JSON written alongside the CSV.
 
 ## Indexing Convention
 
@@ -46,11 +47,32 @@ legacy compatibility target, not as the canonical schema.
 Centroid images are quality-control outputs only. They are derived from the
 point table and should not be treated as the primary data source.
 
+## Point-Cloud Space Metadata
+
+Milestone 1 writes a sidecar JSON next to each point-cloud CSV. The JSON should
+store space-only metadata such as:
+
+- `space_name`
+- `orientation`
+- `axis_labels`
+- `indexing`
+- `units`
+- `shape`
+- `resolution_um`
+
+For raw subject image space, the recommended axis labels are:
+
+- `slice`
+- `row`
+- `col`
+
+and the orientation should use a BrainGlobe-style code such as `sal` where
+voxel `[0, 0, 0]` is superior, anterior, and left.
+
 ## Future Coordinate Spaces
 
 Later milestones will add explicit support for additional spaces such as:
 
-- native LSFM image space
 - downsampled subject voxel space
 - age-specific reference atlas spaces
 - Allen CCFv3

@@ -3,23 +3,41 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 
 import pandas as pd
 
 from lsfm_cell_mapping.io.masks import find_mask_files
 from lsfm_cell_mapping.pointcloud.centroids import extract_centroids_from_mask_stack
+from lsfm_cell_mapping.pointcloud.metadata import (
+    build_pointcloud_space_metadata,
+    write_pointcloud_space_metadata,
+)
 from lsfm_cell_mapping.qc import write_centroid_images
+
+
+def make_subject_output_stem(subject_name: str) -> str:
+    """Convert a subject name into a filesystem-friendly output stem."""
+
+    normalized = re.sub(r"[^A-Za-z0-9_]+", "_", subject_name.strip())
+    normalized = re.sub(r"_+", "_", normalized).strip("_")
+    if not normalized:
+        raise ValueError("subject_name must contain at least one alphanumeric character")
+    return normalized
 
 
 def build_pointcloud_from_masks(
     mask_dir: Path,
     out_dir: Path,
     *,
+    subject_name: str,
+    space_name: str,
+    orientation: str,
+    resolution_um: list[float],
     pattern: str = "masks_*.tif*",
     slice_start: int = 1,
     one_based: bool = True,
     max_workers: int | None = 1,
-    output_name: str = "pointcloud.csv",
     write_qc_images: bool = False,
     show_progress: bool = False,
     progress_interval: int = 25,
@@ -27,6 +45,10 @@ def build_pointcloud_from_masks(
     """Build and export a canonical point cloud from a stack of mask images."""
 
     mask_files = find_mask_files(mask_dir, pattern=pattern)
+    output_stem = make_subject_output_stem(subject_name)
+    csv_path = out_dir / f"{output_stem}_pointcloud.csv"
+    metadata_path = out_dir / f"{output_stem}_pointcloud_space.json"
+
     if show_progress:
         print(f"Found {len(mask_files)} mask slices in {mask_dir}")
     pointcloud = extract_centroids_from_mask_stack(
@@ -39,9 +61,18 @@ def build_pointcloud_from_masks(
     )
 
     out_dir.mkdir(parents=True, exist_ok=True)
-    pointcloud.to_csv(out_dir / output_name, index=False)
+    pointcloud.to_csv(csv_path, index=False)
+    metadata = build_pointcloud_space_metadata(
+        space_name=space_name,
+        orientation=orientation,
+        resolution_um=resolution_um,
+        indexing="one_based" if one_based else "zero_based",
+        mask_files=mask_files,
+    )
+    write_pointcloud_space_metadata(metadata, metadata_path)
     if show_progress:
-        print(f"Wrote point cloud CSV to {out_dir / output_name}")
+        print(f"Wrote point cloud CSV to {csv_path}")
+        print(f"Wrote point cloud space metadata to {metadata_path}")
     if write_qc_images:
         if show_progress:
             print("Writing centroid QC images")
