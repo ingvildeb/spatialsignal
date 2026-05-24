@@ -10,7 +10,8 @@ The first milestone focuses on converting Cellpose mask outputs into a validated
 - read `masks_*.tif*`
 - assign sequential slice indices from naturally sorted file order
 - extract one centroid per labeled object
-- export a canonical CSV with `seg_num,row,col,slice`
+- export a canonical CSV with required columns `seg_num,x,y,z`
+- include standard object-property columns derived from the 2D masks
 - export a space metadata JSON alongside the CSV
 - write centroid QC images
 - validate output against the legacy MATLAB centroid CSV
@@ -55,11 +56,11 @@ The current build config uses five sections:
   - `out_dir`: directory where outputs are written
 - `[space]`
   - `name`: space label for the current point cloud, e.g. `subject_space`
-  - `orientation`: BrainGlobe-style orientation code, e.g. `sal`
-  - `resolution_um`: voxel spacing in axis order `[slice, row, col]`
+  - `orientation`: BrainGlobe-style orientation code, e.g. `las`
+  - `resolution_um`: voxel spacing in axis order `[x, y, z]`
 - `[processing]`
   - `slice_start`: starting value for sequential slice numbering
-  - `one_based`: whether exported `row`/`col` coordinates are 1-based
+  - `one_based`: whether exported `x`/`y`/`z` coordinates are 1-based
   - `max_workers`: number of worker processes for slice-wise centroid extraction
   - `show_progress`: whether to print CLI progress updates
   - `progress_interval`: progress print frequency in slices
@@ -71,7 +72,14 @@ The current build config uses five sections:
 The build script currently writes:
 
 - `{subject_name}_pointcloud.csv`
-  - canonical centroid table with columns `seg_num,row,col,slice`
+  - canonical point-cloud table with required columns `seg_num,x,y,z`
+  - standard additional columns currently include:
+    - `area_px`
+    - `x_float`
+    - `y_float`
+    - `major_axis_length_px`
+    - `minor_axis_length_px`
+    - `eccentricity`
 - `{subject_name}_pointcloud_space.json`
   - space-only metadata describing how to interpret the point cloud
 - `centroids_*.tif`

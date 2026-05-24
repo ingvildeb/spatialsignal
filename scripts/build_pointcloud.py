@@ -13,7 +13,7 @@ def parse_args() -> argparse.Namespace:
     """Parse command-line arguments for point-cloud building."""
 
     parser = argparse.ArgumentParser(
-        description="Build a canonical seg_num,row,col,slice point-cloud CSV from Cellpose masks."
+        description="Build a canonical seg_num,x,y,z point-cloud CSV from Cellpose masks."
     )
     parser.add_argument(
         "--config",

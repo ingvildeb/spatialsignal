@@ -5,13 +5,22 @@
 The canonical point-cloud table for milestone 1 uses the following columns:
 
 - `seg_num`: label ID from the 2D Cellpose mask image
-- `row`: row index of the centroid in image coordinates
-- `col`: column index of the centroid in image coordinates
-- `slice`: sequential slice index assigned from the natural sort order of mask files
+- `x`: image horizontal coordinate
+- `y`: image vertical coordinate
+- `z`: sequential slice index assigned from the natural sort order of mask files
 
 These coordinates describe image-space positions only. They do not yet encode
 anatomical orientation directly in the table itself. Instead, those properties should
 be recorded in a point-cloud space metadata JSON written alongside the CSV.
+
+For the current subject-space pipeline:
+
+- `x` corresponds to image columns
+- `y` corresponds to image rows
+- `z` corresponds to slice order in the stack
+
+This means the canonical table is now expressed directly in image-axis terms
+rather than raw row/column naming.
 
 ## Indexing Convention
 
@@ -39,8 +48,14 @@ The MATLAB pipeline writes a file named `centroids.csv` with columns
 - slice index
 
 In other words, the legacy `x` and `y` headers do not match the underlying
-image-coordinate meaning. The Python package should treat that format as a
-legacy compatibility target, not as the canonical schema.
+image-coordinate meaning. During validation, the Python package remaps:
+
+- legacy MATLAB `x` -> canonical `y`
+- legacy MATLAB `y` -> canonical `x`
+- legacy MATLAB `z` -> canonical `z`
+
+The MATLAB format should therefore be treated as a legacy compatibility target,
+not as the canonical schema.
 
 ## Centroid Images
 
@@ -62,12 +77,12 @@ store space-only metadata such as:
 
 For raw subject image space, the recommended axis labels are:
 
-- `slice`
-- `row`
-- `col`
+- `x`
+- `y`
+- `z`
 
-and the orientation should use a BrainGlobe-style code such as `sal` where
-voxel `[0, 0, 0]` is superior, anterior, and left.
+and the orientation should use a BrainGlobe-style code such as `las` where
+voxel `[0, 0, 0]` is left, anterior, and superior.
 
 ## Future Coordinate Spaces
 

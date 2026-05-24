@@ -22,7 +22,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--python-csv",
         required=True,
-        help="Path to the canonical Python CSV with columns seg_num,row,col,slice.",
+        help="Path to the canonical Python CSV with required columns seg_num,x,y,z.",
     )
     parser.add_argument(
         "--matlab-csv",

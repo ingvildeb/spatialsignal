@@ -10,8 +10,8 @@ out_dir = 'C:\Users\SmartBrain_32C_TR\Documents\GitHub\standard_test_data\lsfm_c
 
 [space]
 name = "subject_space"
-orientation = "sal"
-resolution_um = [5.0, 1.8, 1.8]
+orientation = "las"
+resolution_um = [1.8, 1.8, 5.0]
 
 [processing]
 slice_start = 1

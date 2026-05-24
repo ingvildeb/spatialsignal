@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from lsfm_cell_mapping.pointcloud.centroids import POINTCLOUD_COLUMNS
+from lsfm_cell_mapping.pointcloud.centroids import POINTCLOUD_REQUIRED_COLUMNS
 
 
 LEGACY_MATLAB_COLUMNS = ["seg_num", "x", "y", "z"]
@@ -40,10 +40,11 @@ def load_canonical_pointcloud_csv(csv_path: Path) -> pd.DataFrame:
     """Load a canonical point-cloud CSV and validate its schema."""
 
     df = pd.read_csv(csv_path)
-    expected = POINTCLOUD_COLUMNS
-    if list(df.columns) != expected:
+    expected = POINTCLOUD_REQUIRED_COLUMNS
+    missing = [column for column in expected if column not in df.columns]
+    if missing:
         raise ValueError(
-            f"Canonical CSV at {csv_path} has columns {list(df.columns)}, expected {expected}"
+            f"Canonical CSV at {csv_path} is missing required columns {missing}"
         )
 
     return df.astype({column: int for column in expected})
@@ -67,8 +68,8 @@ def load_legacy_matlab_centroids_csv(csv_path: Path) -> pd.DataFrame:
             f"MATLAB CSV at {csv_path} has columns {list(df.columns)}, expected {expected}"
         )
 
-    df = df.rename(columns={"x": "row", "y": "col", "z": "slice"})
-    return df[POINTCLOUD_COLUMNS].astype({column: int for column in POINTCLOUD_COLUMNS})
+    df = df.rename(columns={"x": "y", "y": "x", "z": "z"})
+    return df[POINTCLOUD_REQUIRED_COLUMNS].astype({column: int for column in POINTCLOUD_REQUIRED_COLUMNS})
 
 
 def relabel_slices_in_natural_order(df: pd.DataFrame) -> pd.DataFrame:
@@ -79,9 +80,9 @@ def relabel_slices_in_natural_order(df: pd.DataFrame) -> pd.DataFrame:
     """
 
     relabeled = df.copy()
-    unique_slices = sorted(relabeled["slice"].unique())
+    unique_slices = sorted(relabeled["z"].unique())
     slice_map = {original_slice: index for index, original_slice in enumerate(unique_slices, start=1)}
-    relabeled["slice"] = relabeled["slice"].map(slice_map)
+    relabeled["z"] = relabeled["z"].map(slice_map)
     return relabeled
 
 
@@ -98,19 +99,19 @@ def compare_pointcloud_tables(
         contain rows that are not shared between the inputs.
     """
 
-    python_norm = python_df.sort_values(POINTCLOUD_COLUMNS).reset_index(drop=True)
-    matlab_norm = matlab_df.sort_values(POINTCLOUD_COLUMNS).reset_index(drop=True)
+    python_norm = python_df.sort_values(POINTCLOUD_REQUIRED_COLUMNS).reset_index(drop=True)
+    matlab_norm = matlab_df.sort_values(POINTCLOUD_REQUIRED_COLUMNS).reset_index(drop=True)
 
     python_counts = (
-        python_norm.value_counts(subset=POINTCLOUD_COLUMNS).rename("python_count").reset_index()
+        python_norm.value_counts(subset=POINTCLOUD_REQUIRED_COLUMNS).rename("python_count").reset_index()
     )
     matlab_counts = (
-        matlab_norm.value_counts(subset=POINTCLOUD_COLUMNS).rename("matlab_count").reset_index()
+        matlab_norm.value_counts(subset=POINTCLOUD_REQUIRED_COLUMNS).rename("matlab_count").reset_index()
     )
 
     merged = python_counts.merge(
         matlab_counts,
-        on=POINTCLOUD_COLUMNS,
+        on=POINTCLOUD_REQUIRED_COLUMNS,
         how="outer",
     ).fillna(0)
 

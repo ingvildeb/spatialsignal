@@ -10,8 +10,7 @@ import pandas as pd
 from lsfm_cell_mapping.io.masks import find_mask_files
 from lsfm_cell_mapping.pointcloud.centroids import extract_centroids_from_mask_stack
 from lsfm_cell_mapping.pointcloud.metadata import (
-    build_pointcloud_space_metadata,
-    write_pointcloud_space_metadata,
+    PointCloudSpace,
 )
 from lsfm_cell_mapping.qc import write_centroid_images
 
@@ -62,14 +61,14 @@ def build_pointcloud_from_masks(
 
     out_dir.mkdir(parents=True, exist_ok=True)
     pointcloud.to_csv(csv_path, index=False)
-    metadata = build_pointcloud_space_metadata(
+    space = PointCloudSpace.from_mask_files(
         space_name=space_name,
         orientation=orientation,
         resolution_um=resolution_um,
         indexing="one_based" if one_based else "zero_based",
         mask_files=mask_files,
     )
-    write_pointcloud_space_metadata(metadata, metadata_path)
+    space.to_json(metadata_path)
     if show_progress:
         print(f"Wrote point cloud CSV to {csv_path}")
         print(f"Wrote point cloud space metadata to {metadata_path}")

@@ -21,19 +21,19 @@ def pointcloud_slice_to_image(
     if slice_points.empty:
         return image
 
-    row_offset = 1 if one_based else 0
-    col_offset = 1 if one_based else 0
+    x_offset = 1 if one_based else 0
+    y_offset = 1 if one_based else 0
 
-    rows = slice_points["row"].to_numpy(dtype=int) - row_offset
-    cols = slice_points["col"].to_numpy(dtype=int) - col_offset
+    ys = slice_points["y"].to_numpy(dtype=int) - y_offset
+    xs = slice_points["x"].to_numpy(dtype=int) - x_offset
 
     in_bounds = (
-        (rows >= 0)
-        & (rows < image_shape[0])
-        & (cols >= 0)
-        & (cols < image_shape[1])
+        (ys >= 0)
+        & (ys < image_shape[0])
+        & (xs >= 0)
+        & (xs < image_shape[1])
     )
-    image[rows[in_bounds], cols[in_bounds]] = 255
+    image[ys[in_bounds], xs[in_bounds]] = 255
     return image
 
 
@@ -51,7 +51,7 @@ def write_centroid_images(
 
     for slice_index, mask_path in enumerate(mask_files, start=1):
         mask = tifffile.imread(mask_path)
-        slice_points = pointcloud.loc[pointcloud["slice"] == slice_index]
+        slice_points = pointcloud.loc[pointcloud["z"] == slice_index]
         image = pointcloud_slice_to_image(
             slice_points,
             mask.shape,

@@ -3,11 +3,18 @@
 from .build import build_pointcloud_from_masks
 from .centroids import (
     POINTCLOUD_COLUMNS,
+    POINTCLOUD_OPTIONAL_COLUMNS,
+    POINTCLOUD_REQUIRED_COLUMNS,
     extract_centroids_from_mask,
     extract_centroids_from_mask_stack,
     matlab_round,
 )
-from .metadata import build_pointcloud_space_metadata, write_pointcloud_space_metadata
+from .dataset import PointCloudDataset
+from .metadata import (
+    PointCloudSpace,
+    build_pointcloud_space_metadata,
+    write_pointcloud_space_metadata,
+)
 from .validate import (
     ValidationReport,
     compare_pointcloud_tables,
@@ -19,6 +26,10 @@ from .validate import (
 __all__ = [
     "build_pointcloud_from_masks",
     "POINTCLOUD_COLUMNS",
+    "POINTCLOUD_OPTIONAL_COLUMNS",
+    "POINTCLOUD_REQUIRED_COLUMNS",
+    "PointCloudDataset",
+    "PointCloudSpace",
     "ValidationReport",
     "build_pointcloud_space_metadata",
     "compare_pointcloud_tables",

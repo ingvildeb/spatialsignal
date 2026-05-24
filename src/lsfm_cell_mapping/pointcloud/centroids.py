@@ -9,12 +9,21 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import tifffile
-from scipy import ndimage
+from skimage.measure import regionprops_table
 
 from lsfm_cell_mapping.io.masks import assign_slices
 
 
-POINTCLOUD_COLUMNS = ["seg_num", "row", "col", "slice"]
+POINTCLOUD_REQUIRED_COLUMNS = ["seg_num", "x", "y", "z"]
+POINTCLOUD_OPTIONAL_COLUMNS = [
+    "area_px",
+    "x_float",
+    "y_float",
+    "major_axis_length_px",
+    "minor_axis_length_px",
+    "eccentricity",
+]
+POINTCLOUD_COLUMNS = POINTCLOUD_REQUIRED_COLUMNS + POINTCLOUD_OPTIONAL_COLUMNS
 
 
 def matlab_round(value: float) -> int:
@@ -54,17 +63,36 @@ def extract_centroids_from_mask(
     if labels.size == 0:
         return pd.DataFrame(columns=POINTCLOUD_COLUMNS)
 
-    centroids = ndimage.center_of_mass(mask, labels=mask, index=labels)
+    props = regionprops_table(
+        mask,
+        properties=(
+            "label",
+            "centroid",
+            "area",
+            "major_axis_length",
+            "minor_axis_length",
+            "eccentricity",
+        ),
+    )
+    props_df = pd.DataFrame(props)
     offset = 1 if one_based else 0
 
-    rows: list[dict[str, int]] = []
-    for seg_num, (row, col) in zip(labels, centroids, strict=True):
+    rows: list[dict[str, int | float]] = []
+    for _, prop_row in props_df.iterrows():
+        y_float = float(prop_row["centroid-0"])
+        x_float = float(prop_row["centroid-1"])
         rows.append(
             {
-                "seg_num": int(seg_num),
-                "row": matlab_round(float(row)) + offset,
-                "col": matlab_round(float(col)) + offset,
-                "slice": int(slice_index),
+                "seg_num": int(prop_row["label"]),
+                "x": matlab_round(x_float) + offset,
+                "y": matlab_round(y_float) + offset,
+                "z": int(slice_index),
+                "area_px": int(prop_row["area"]),
+                "x_float": x_float + offset,
+                "y_float": y_float + offset,
+                "major_axis_length_px": float(prop_row["major_axis_length"]),
+                "minor_axis_length_px": float(prop_row["minor_axis_length"]),
+                "eccentricity": float(prop_row["eccentricity"]),
             }
         )
 

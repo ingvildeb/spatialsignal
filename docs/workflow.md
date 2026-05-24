@@ -16,7 +16,8 @@ The first implementation milestone focuses on a single task:
 
 - Cellpose mask ingestion from `masks_*.tif*`
 - Centroid extraction from labeled 2D masks
-- Canonical point-cloud CSV export with explicit spatial column names
+- Canonical point-cloud CSV export with explicit `x,y,z` coordinates
+- Standard per-object mask-derived properties stored alongside the points
 - Point-cloud space JSON export
 - Centroid QC image output
 - Comparison against the legacy MATLAB centroid CSV
