@@ -13,7 +13,7 @@ def parse_args() -> argparse.Namespace:
     """Parse command-line arguments for point-cloud building."""
 
     parser = argparse.ArgumentParser(
-        description="Build a canonical seg_num,x,y,z point-cloud CSV from Cellpose masks."
+        description="Build a canonical detection_id,seg_num,x,y,z point-cloud CSV from Cellpose masks."
     )
     parser.add_argument(
         "--config",
@@ -39,6 +39,7 @@ def main() -> int:
     space_name = require_config_value(config, "space", "name")
     orientation = require_config_value(config, "space", "orientation")
     resolution_um = require_config_value(config, "space", "resolution_um")
+    representation_type = config.get("space", {}).get("representation_type", "point_centroids")
 
     slice_start = int(config.get("processing", {}).get("slice_start", 1))
     one_based = bool(config.get("processing", {}).get("one_based", True))
@@ -54,6 +55,7 @@ def main() -> int:
         space_name=space_name,
         orientation=orientation,
         resolution_um=resolution_um,
+        representation_type=representation_type,
         pattern=pattern,
         slice_start=slice_start,
         one_based=one_based,

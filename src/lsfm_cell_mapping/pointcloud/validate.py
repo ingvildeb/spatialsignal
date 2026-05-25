@@ -11,6 +11,7 @@ from lsfm_cell_mapping.pointcloud.centroids import POINTCLOUD_REQUIRED_COLUMNS
 
 
 LEGACY_MATLAB_COLUMNS = ["seg_num", "x", "y", "z"]
+POINTCLOUD_COMPARISON_COLUMNS = ["seg_num", "x", "y", "z"]
 
 
 @dataclass(frozen=True)
@@ -69,6 +70,7 @@ def load_legacy_matlab_centroids_csv(csv_path: Path) -> pd.DataFrame:
         )
 
     df = df.rename(columns={"x": "y", "y": "x", "z": "z"})
+    df["detection_id"] = range(1, len(df) + 1)
     return df[POINTCLOUD_REQUIRED_COLUMNS].astype({column: int for column in POINTCLOUD_REQUIRED_COLUMNS})
 
 
@@ -99,19 +101,19 @@ def compare_pointcloud_tables(
         contain rows that are not shared between the inputs.
     """
 
-    python_norm = python_df.sort_values(POINTCLOUD_REQUIRED_COLUMNS).reset_index(drop=True)
-    matlab_norm = matlab_df.sort_values(POINTCLOUD_REQUIRED_COLUMNS).reset_index(drop=True)
+    python_norm = python_df.sort_values(POINTCLOUD_COMPARISON_COLUMNS).reset_index(drop=True)
+    matlab_norm = matlab_df.sort_values(POINTCLOUD_COMPARISON_COLUMNS).reset_index(drop=True)
 
     python_counts = (
-        python_norm.value_counts(subset=POINTCLOUD_REQUIRED_COLUMNS).rename("python_count").reset_index()
+        python_norm.value_counts(subset=POINTCLOUD_COMPARISON_COLUMNS).rename("python_count").reset_index()
     )
     matlab_counts = (
-        matlab_norm.value_counts(subset=POINTCLOUD_REQUIRED_COLUMNS).rename("matlab_count").reset_index()
+        matlab_norm.value_counts(subset=POINTCLOUD_COMPARISON_COLUMNS).rename("matlab_count").reset_index()
     )
 
     merged = python_counts.merge(
         matlab_counts,
-        on=POINTCLOUD_REQUIRED_COLUMNS,
+        on=POINTCLOUD_COMPARISON_COLUMNS,
         how="outer",
     ).fillna(0)
 

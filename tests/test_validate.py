@@ -26,9 +26,10 @@ def test_load_legacy_matlab_centroids_csv_maps_columns_to_canonical(
 
     expected = pd.DataFrame(
         [
-            {"seg_num": 1, "x": 20, "y": 10, "z": 4},
-            {"seg_num": 2, "x": 40, "y": 30, "z": 8},
-        ]
+            {"detection_id": 1, "seg_num": 1, "x": 20, "y": 10, "z": 4},
+            {"detection_id": 2, "seg_num": 2, "x": 40, "y": 30, "z": 8},
+        ],
+        columns=POINTCLOUD_REQUIRED_COLUMNS,
     )
 
     pd.testing.assert_frame_equal(loaded, expected)
@@ -37,9 +38,9 @@ def test_load_legacy_matlab_centroids_csv_maps_columns_to_canonical(
 def test_relabel_slices_in_natural_order_maps_unique_sorted_values() -> None:
     df = pd.DataFrame(
         [
-            {"seg_num": 1, "x": 20, "y": 10, "z": 4},
-            {"seg_num": 2, "x": 40, "y": 30, "z": 12},
-            {"seg_num": 3, "x": 60, "y": 50, "z": 8},
+            {"detection_id": 1, "seg_num": 1, "x": 20, "y": 10, "z": 4},
+            {"detection_id": 2, "seg_num": 2, "x": 40, "y": 30, "z": 12},
+            {"detection_id": 3, "seg_num": 3, "x": 60, "y": 50, "z": 8},
         ]
     )
 
@@ -54,8 +55,8 @@ def test_compare_pointcloud_tables_reports_full_match(tmp_path: Path) -> None:
 
     pd.DataFrame(
         [
-            {"seg_num": 1, "x": 20, "y": 10, "z": 1},
-            {"seg_num": 2, "x": 40, "y": 30, "z": 2},
+            {"detection_id": 1, "seg_num": 1, "x": 20, "y": 10, "z": 1},
+            {"detection_id": 2, "seg_num": 2, "x": 40, "y": 30, "z": 2},
         ]
     , columns=POINTCLOUD_REQUIRED_COLUMNS).to_csv(python_csv, index=False)
 

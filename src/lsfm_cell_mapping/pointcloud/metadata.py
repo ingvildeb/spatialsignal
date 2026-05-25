@@ -1,4 +1,4 @@
-"""Point-cloud space metadata helpers."""
+"""Point-cloud metadata helpers."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ import tifffile
 
 @dataclass
 class PointCloudSpace:
-    """Space-only metadata describing how to interpret a point cloud."""
+    """Metadata describing how to interpret a point cloud."""
 
     schema_name: str
     schema_version: str
@@ -23,6 +23,8 @@ class PointCloudSpace:
     units: str
     shape: list[int]
     resolution_um: list[float]
+    representation_type: str = "point_centroids"
+    processing: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Convert the metadata object to a plain dictionary."""
@@ -51,6 +53,8 @@ class PointCloudSpace:
             units=data["units"],
             shape=data["shape"],
             resolution_um=data["resolution_um"],
+            representation_type=data.get("representation_type", "point_centroids"),
+            processing=data.get("processing"),
         )
 
     @classmethod
@@ -70,6 +74,7 @@ class PointCloudSpace:
         resolution_um: list[float],
         indexing: str,
         mask_files: list[Path],
+        representation_type: str = "point_centroids",
         axis_labels: list[str] | None = None,
         schema_name: str = "lsfm_cell_mapping.pointcloud_space",
         schema_version: str = "0.1.0",
@@ -99,6 +104,7 @@ class PointCloudSpace:
             units="voxel",
             shape=shape,
             resolution_um=[float(value) for value in resolution_um],
+            representation_type=representation_type,
         )
 
 
@@ -109,11 +115,12 @@ def build_pointcloud_space_metadata(
     resolution_um: list[float],
     indexing: str,
     mask_files: list[Path],
+    representation_type: str = "point_centroids",
     axis_labels: list[str] | None = None,
     schema_name: str = "lsfm_cell_mapping.pointcloud_space",
     schema_version: str = "0.1.0",
 ) -> dict[str, Any]:
-    """Build space-only metadata for a point cloud in image voxel space."""
+    """Build point-cloud metadata for a point cloud in image voxel space."""
 
     return PointCloudSpace.from_mask_files(
         space_name=space_name,
@@ -121,6 +128,7 @@ def build_pointcloud_space_metadata(
         resolution_um=resolution_um,
         indexing=indexing,
         mask_files=mask_files,
+        representation_type=representation_type,
         axis_labels=axis_labels,
         schema_name=schema_name,
         schema_version=schema_version,

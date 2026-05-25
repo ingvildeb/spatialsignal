@@ -4,6 +4,7 @@
 
 The canonical point-cloud table for milestone 1 uses the following columns:
 
+- `detection_id`: dataset-wide unique identifier for one raw 2D detection
 - `seg_num`: label ID from the 2D Cellpose mask image
 - `x`: image horizontal coordinate
 - `y`: image vertical coordinate
@@ -55,7 +56,9 @@ image-coordinate meaning. During validation, the Python package remaps:
 - legacy MATLAB `z` -> canonical `z`
 
 The MATLAB format should therefore be treated as a legacy compatibility target,
-not as the canonical schema.
+not as the canonical schema. When loading legacy MATLAB CSVs into the current
+schema, the Python package assigns synthetic sequential `detection_id` values,
+but those IDs are not used for Python-vs-MATLAB coordinate matching.
 
 ## Centroid Images
 
@@ -65,10 +68,12 @@ point table and should not be treated as the primary data source.
 ## Point-Cloud Space Metadata
 
 Milestone 1 writes a sidecar JSON next to each point-cloud CSV. The JSON should
-store space-only metadata such as:
+store metadata describing both the point cloud's spatial frame and what the
+rows represent, such as:
 
 - `space_name`
 - `orientation`
+- `representation_type`
 - `axis_labels`
 - `indexing`
 - `units`
@@ -83,6 +88,30 @@ For raw subject image space, the recommended axis labels are:
 
 and the orientation should use a BrainGlobe-style code such as `las` where
 voxel `[0, 0, 0]` is left, anterior, and superior.
+
+For the current cell-body workflow, the recommended representation type is:
+
+- `point_centroids`
+
+This distinguishes centroid-based instance summaries from future coordinate
+tables such as dense signal-support points (`signal_points`) or skeletonized
+ramification coordinates (`skeleton_points`).
+
+## Cleaned Object Outputs
+
+Cross-plane deduplication does not change the spatial frame of the data. The
+cleaned object outputs remain in the same `x,y,z` image-axis convention and use
+the same point-cloud space definition as the raw detections.
+
+What changes is the identity of each row:
+
+- raw point cloud: one row = one 2D detection in one plane
+- cleaned object point cloud: one row = one deduplicated object aggregated
+  across one or more nearby planes
+
+The cleaned objects JSON therefore keeps the same spatial metadata fields and
+adds a `processing` section describing how the deduplication output was
+derived.
 
 ## Future Coordinate Spaces
 

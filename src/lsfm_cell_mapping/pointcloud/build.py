@@ -33,6 +33,7 @@ def build_pointcloud_from_masks(
     space_name: str,
     orientation: str,
     resolution_um: list[float],
+    representation_type: str = "point_centroids",
     pattern: str = "masks_*.tif*",
     slice_start: int = 1,
     one_based: bool = True,
@@ -67,6 +68,7 @@ def build_pointcloud_from_masks(
         resolution_um=resolution_um,
         indexing="one_based" if one_based else "zero_based",
         mask_files=mask_files,
+        representation_type=representation_type,
     )
     space.to_json(metadata_path)
     if show_progress:

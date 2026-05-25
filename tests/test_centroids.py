@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 
 import numpy as np
 import pandas as pd
@@ -40,6 +41,7 @@ def test_extract_centroids_from_mask_returns_expected_columns_and_values(tmp_pat
     expected = pd.DataFrame(
         [
             {
+                "detection_id": 1,
                 "seg_num": 1,
                 "x": 3,
                 "y": 1,
@@ -52,6 +54,7 @@ def test_extract_centroids_from_mask_returns_expected_columns_and_values(tmp_pat
                 "eccentricity": 1.0,
             },
             {
+                "detection_id": 2,
                 "seg_num": 2,
                 "x": 2,
                 "y": 3,
@@ -110,9 +113,9 @@ def test_extract_centroids_from_mask_stack_uses_slice_order(tmp_path: Path) -> N
 
     expected_xyz = pd.DataFrame(
         [
-            {"seg_num": 1, "x": 3, "y": 1, "z": 1},
-            {"seg_num": 2, "x": 2, "y": 3, "z": 1},
-            {"seg_num": 3, "x": 3, "y": 2, "z": 2},
+            {"detection_id": 1, "seg_num": 1, "x": 3, "y": 1, "z": 1},
+            {"detection_id": 2, "seg_num": 2, "x": 2, "y": 3, "z": 1},
+            {"detection_id": 3, "seg_num": 3, "x": 3, "y": 2, "z": 2},
         ]
     )
 
@@ -125,8 +128,8 @@ def test_extract_centroids_from_mask_stack_uses_slice_order(tmp_path: Path) -> N
 def test_pointcloud_slice_to_image_marks_expected_pixels() -> None:
     slice_points = pd.DataFrame(
         [
-            {"seg_num": 1, "x": 3, "y": 1, "z": 1},
-            {"seg_num": 2, "x": 2, "y": 3, "z": 1},
+            {"detection_id": 1, "seg_num": 1, "x": 3, "y": 1, "z": 1},
+            {"detection_id": 2, "seg_num": 2, "x": 2, "y": 3, "z": 1},
         ]
     )
 
@@ -171,6 +174,11 @@ def test_build_pointcloud_from_masks_writes_csv_and_space_json(tmp_path: Path) -
 
     assert (out_dir / "Test_Subject_pointcloud.csv").exists()
     assert (out_dir / "Test_Subject_pointcloud_space.json").exists()
+    pointcloud = pd.read_csv(out_dir / "Test_Subject_pointcloud.csv")
+    assert list(pointcloud["detection_id"]) == [1, 2]
+    with (out_dir / "Test_Subject_pointcloud_space.json").open("r", encoding="utf-8") as handle:
+        metadata = json.load(handle)
+    assert metadata["representation_type"] == "point_centroids"
 
 
 def test_pointcloud_space_round_trip_json(tmp_path: Path) -> None:
@@ -184,6 +192,12 @@ def test_pointcloud_space_round_trip_json(tmp_path: Path) -> None:
         units="voxel",
         shape=[10, 20, 30],
         resolution_um=[1.8, 1.8, 5.0],
+        representation_type="point_centroids",
+        processing={
+            "stage": "deduplicate_across_planes",
+            "parameters": {"max_plane_offset": 1, "max_xy_distance_um": 3.0, "max_n_planes": 2},
+            "summary": {"raw_detections": 10, "cleaned_objects": 8, "accepted_edges": 2},
+        },
     )
 
     json_path = tmp_path / "space.json"
@@ -193,14 +207,32 @@ def test_pointcloud_space_round_trip_json(tmp_path: Path) -> None:
     assert loaded == space
 
 
+def test_pointcloud_space_from_legacy_dict_defaults_representation_type() -> None:
+    legacy = {
+        "schema_name": "lsfm_cell_mapping.pointcloud_space",
+        "schema_version": "0.1.0",
+        "space_name": "subject_space",
+        "orientation": "las",
+        "axis_labels": ["x", "y", "z"],
+        "indexing": "one_based",
+        "units": "voxel",
+        "shape": [10, 20, 30],
+        "resolution_um": [1.8, 1.8, 5.0],
+    }
+
+    loaded = PointCloudSpace.from_dict(legacy)
+
+    assert loaded.representation_type == "point_centroids"
+
+
 def test_pointcloud_dataset_from_files_and_summary(tmp_path: Path) -> None:
     csv_path = tmp_path / "Test_Subject_pointcloud.csv"
     json_path = tmp_path / "Test_Subject_pointcloud_space.json"
 
     pd.DataFrame(
         [
-            {"seg_num": 1, "x": 3, "y": 1, "z": 1},
-            {"seg_num": 2, "x": 2, "y": 3, "z": 1},
+            {"detection_id": 1, "seg_num": 1, "x": 3, "y": 1, "z": 1},
+            {"detection_id": 2, "seg_num": 2, "x": 2, "y": 3, "z": 1},
         ],
         columns=POINTCLOUD_REQUIRED_COLUMNS,
     ).to_csv(csv_path, index=False)
@@ -215,6 +247,7 @@ def test_pointcloud_dataset_from_files_and_summary(tmp_path: Path) -> None:
         units="voxel",
         shape=[3, 3, 1],
         resolution_um=[1.8, 1.8, 5.0],
+        representation_type="point_centroids",
     ).to_json(json_path)
 
     dataset = PointCloudDataset.from_files(csv_path, json_path)
@@ -234,7 +267,7 @@ def test_pointcloud_dataset_validate_raises_for_out_of_bounds_points(tmp_path: P
 
     pd.DataFrame(
         [
-            {"seg_num": 1, "x": 4, "y": 1, "z": 1},
+            {"detection_id": 1, "seg_num": 1, "x": 4, "y": 1, "z": 1},
         ],
         columns=POINTCLOUD_REQUIRED_COLUMNS,
     ).to_csv(csv_path, index=False)
@@ -249,6 +282,7 @@ def test_pointcloud_dataset_validate_raises_for_out_of_bounds_points(tmp_path: P
         units="voxel",
         shape=[3, 3, 1],
         resolution_um=[1.8, 1.8, 5.0],
+        representation_type="point_centroids",
     ).to_json(json_path)
 
     dataset = PointCloudDataset.from_files(csv_path, json_path)
@@ -267,8 +301,8 @@ def _make_valid_dataset_files(tmp_path: Path) -> tuple[Path, Path]:
 
     pd.DataFrame(
         [
-            {"seg_num": 1, "x": 3, "y": 1, "z": 1},
-            {"seg_num": 2, "x": 2, "y": 3, "z": 1},
+            {"detection_id": 1, "seg_num": 1, "x": 3, "y": 1, "z": 1},
+            {"detection_id": 2, "seg_num": 2, "x": 2, "y": 3, "z": 1},
         ],
         columns=POINTCLOUD_REQUIRED_COLUMNS,
     ).to_csv(csv_path, index=False)
@@ -283,6 +317,7 @@ def _make_valid_dataset_files(tmp_path: Path) -> tuple[Path, Path]:
         units="voxel",
         shape=[3, 3, 1],
         resolution_um=[1.8, 1.8, 5.0],
+        representation_type="point_centroids",
     ).to_json(json_path)
 
     return csv_path, json_path
@@ -293,7 +328,7 @@ def test_dataset_columns_invalid(tmp_path: Path) -> None:
 
     pd.DataFrame(
         [
-            {"seg_num": 1, "x": 3, "y": 1},
+            {"detection_id": 1, "seg_num": 1, "x": 3, "y": 1},
         ]
     ).to_csv(csv_path, index=False)
 
@@ -320,6 +355,7 @@ def test_dataset_axis_metadata_invalid(tmp_path: Path) -> None:
         units="voxel",
         shape=[3, 3, 1],
         resolution_um=[1.8, 1.8, 5.0],
+        representation_type="point_centroids",
     ).to_json(json_path)
 
     dataset = PointCloudDataset.from_files(csv_path, json_path)
@@ -345,6 +381,7 @@ def test_dataset_indexing_invalid(tmp_path: Path) -> None:
         units="voxel",
         shape=[3, 3, 1],
         resolution_um=[1.8, 1.8, 5.0],
+        representation_type="point_centroids",
     ).to_json(json_path)
 
     dataset = PointCloudDataset.from_files(csv_path, json_path)
@@ -362,7 +399,7 @@ def test_dataset_bounds_invalid(tmp_path: Path) -> None:
 
     pd.DataFrame(
         [
-            {"seg_num": 1, "x": 4, "y": 1, "z": 1},
+            {"detection_id": 1, "seg_num": 1, "x": 4, "y": 1, "z": 1},
         ],
         columns=POINTCLOUD_REQUIRED_COLUMNS,
     ).to_csv(csv_path, index=False)

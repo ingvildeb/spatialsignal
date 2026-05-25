@@ -10,6 +10,16 @@ from .centroids import (
     matlab_round,
 )
 from .dataset import PointCloudDataset
+from .deduplicate import (
+    CLEANED_OBJECT_REQUIRED_COLUMNS,
+    EDGE_COLUMNS,
+    DeduplicationResult,
+    aggregate_cleaned_objects,
+    build_cross_plane_edge_table,
+    build_object_membership_table,
+    deduplicate_across_planes,
+    summarize_deduplication_result,
+)
 from .metadata import (
     PointCloudSpace,
     build_pointcloud_space_metadata,
@@ -30,14 +40,22 @@ __all__ = [
     "POINTCLOUD_REQUIRED_COLUMNS",
     "PointCloudDataset",
     "PointCloudSpace",
+    "CLEANED_OBJECT_REQUIRED_COLUMNS",
+    "DeduplicationResult",
+    "EDGE_COLUMNS",
     "ValidationReport",
+    "aggregate_cleaned_objects",
     "build_pointcloud_space_metadata",
+    "build_cross_plane_edge_table",
+    "build_object_membership_table",
     "compare_pointcloud_tables",
+    "deduplicate_across_planes",
     "extract_centroids_from_mask",
     "extract_centroids_from_mask_stack",
     "load_canonical_pointcloud_csv",
     "load_legacy_matlab_centroids_csv",
     "matlab_round",
     "relabel_slices_in_natural_order",
+    "summarize_deduplication_result",
     "write_pointcloud_space_metadata",
 ]

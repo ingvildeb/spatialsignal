@@ -14,7 +14,7 @@ from skimage.measure import regionprops_table
 from lsfm_cell_mapping.io.masks import assign_slices
 
 
-POINTCLOUD_REQUIRED_COLUMNS = ["seg_num", "x", "y", "z"]
+POINTCLOUD_REQUIRED_COLUMNS = ["detection_id", "seg_num", "x", "y", "z"]
 POINTCLOUD_OPTIONAL_COLUMNS = [
     "area_px",
     "x_float",
@@ -84,6 +84,7 @@ def extract_centroids_from_mask(
         rows.append(
             {
                 "seg_num": int(prop_row["label"]),
+                "detection_id": int(prop_row["label"]),
                 "x": matlab_round(x_float) + offset,
                 "y": matlab_round(y_float) + offset,
                 "z": int(slice_index),
@@ -96,7 +97,9 @@ def extract_centroids_from_mask(
             }
         )
 
-    return pd.DataFrame(rows, columns=POINTCLOUD_COLUMNS)
+    pointcloud = pd.DataFrame(rows, columns=POINTCLOUD_COLUMNS)
+    pointcloud["detection_id"] = np.arange(1, len(pointcloud) + 1, dtype=int)
+    return pointcloud
 
 
 def _extract_centroids_task(task: tuple[Path, int, bool]) -> tuple[int, pd.DataFrame]:
@@ -159,4 +162,6 @@ def extract_centroids_from_mask_stack(
     if not pointcloud_tables:
         return pd.DataFrame(columns=POINTCLOUD_COLUMNS)
 
-    return pd.concat(pointcloud_tables, ignore_index=True)
+    pointcloud = pd.concat(pointcloud_tables, ignore_index=True)
+    pointcloud["detection_id"] = np.arange(1, len(pointcloud) + 1, dtype=int)
+    return pointcloud[POINTCLOUD_COLUMNS]
