@@ -79,8 +79,9 @@ The current build config uses five sections:
 - `[space]`
   - `name`: space label for the current point cloud, e.g. `subject_space`
   - `orientation`: BrainGlobe-style orientation code, e.g. `las`
-  - `representation_type`: what one row of coordinates represents, e.g. `point_centroids`
   - `resolution_um`: voxel spacing in axis order `[x, y, z]`
+- `[data]`
+  - `representation_type`: what one row of coordinates represents, e.g. `point_centroids`
 - `[processing]`
   - `slice_start`: starting value for sequential slice numbering
   - `one_based`: whether exported `x`/`y`/`z` coordinates are 1-based

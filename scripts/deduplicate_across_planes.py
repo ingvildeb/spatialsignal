@@ -8,6 +8,7 @@ from pathlib import Path
 
 from lsfm_cell_mapping.pointcloud import (
     PointCloudDataset,
+    ProcessingProvenance,
     deduplicate_across_planes,
     summarize_deduplication_result,
 )
@@ -130,20 +131,20 @@ def main() -> int:
     edges_csv = out_dir / f"{output_stem}_object_edges.csv"
     membership_csv = out_dir / f"{output_stem}_object_membership.csv"
 
-    processing_metadata = {
-        "stage": "deduplicate_across_planes",
-        "source_pointcloud_csv": Path(args.pointcloud_csv).name,
-        "parameters": {
+    processing_metadata = ProcessingProvenance(
+        stage="deduplicate_across_planes",
+        source_name=Path(args.pointcloud_csv).name,
+        parameters={
             "max_plane_offset": args.max_plane_offset,
             "max_xy_distance_um": args.max_xy_distance_um,
             "max_n_planes": args.max_n_planes,
         },
-        "summary": summarize_deduplication_result(dataset.points, result),
-    }
-    objects_space = replace(dataset.space, processing=processing_metadata)
+        summary=summarize_deduplication_result(dataset.points, result),
+    )
+    objects_metadata = replace(dataset.metadata, processing=processing_metadata)
 
     result.objects.to_csv(objects_csv, index=False)
-    objects_space.to_json(objects_json)
+    objects_metadata.to_json(objects_json)
     result.membership.to_csv(membership_csv, index=False)
     if args.write_edge_table:
         result.edges.to_csv(edges_csv, index=False)

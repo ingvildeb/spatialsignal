@@ -11,8 +11,10 @@ out_dir = 'C:\Users\SmartBrain_32C_TR\Documents\GitHub\standard_test_data\lsfm_c
 [space]
 name = "subject_space"
 orientation = "las"
-representation_type = "point_centroids"
 resolution_um = [1.8, 1.8, 20.0]
+
+[data]
+representation_type = "point_centroids"
 
 [processing]
 slice_start = 1

@@ -1,4 +1,4 @@
-"""Point-cloud dataset model bundling points with space metadata."""
+"""Shared dataset model definitions."""
 
 from __future__ import annotations
 
@@ -6,19 +6,22 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
-from lsfm_cell_mapping.pointcloud.centroids import POINTCLOUD_REQUIRED_COLUMNS
-from lsfm_cell_mapping.pointcloud.metadata import PointCloudSpace
+from lsfm_cell_mapping.models.metadata import DatasetMetadata, SpaceDefinition
+
+
+POINTCLOUD_REQUIRED_COLUMNS = ["detection_id", "seg_num", "x", "y", "z"]
 
 
 @dataclass
 class PointCloudDataset:
-    """A point cloud together with the space metadata needed to interpret it."""
+    """A point cloud together with the metadata needed to interpret it."""
 
     subject_name: str
     points: pd.DataFrame
-    space: PointCloudSpace
+    metadata: DatasetMetadata
 
     @classmethod
     def from_files(
@@ -28,10 +31,10 @@ class PointCloudDataset:
         *,
         subject_name: str | None = None,
     ) -> "PointCloudDataset":
-        """Load a point-cloud dataset from a CSV and matching space JSON."""
+        """Load a point-cloud dataset from a CSV and matching metadata JSON."""
 
         points = pd.read_csv(csv_path)
-        space = PointCloudSpace.from_json(json_path)
+        metadata = DatasetMetadata.from_json(json_path)
 
         if subject_name is None:
             subject_name = _infer_subject_name_from_pointcloud_path(csv_path)
@@ -39,13 +42,25 @@ class PointCloudDataset:
         return cls(
             subject_name=subject_name,
             points=points,
-            space=space,
+            metadata=metadata,
         )
+
+    @property
+    def space(self) -> SpaceDefinition:
+        """Convenience accessor for the dataset spatial definition."""
+
+        return self.metadata.space
 
     def validate(self) -> None:
         """Validate the dataset schema and coordinate bounds."""
 
         _validate_required_columns(self.points)
+        self.validate_spatial_points()
+
+    def validate_spatial_points(self) -> None:
+        """Validate the spatial coordinate contract for any point-based dataset."""
+
+        _validate_spatial_coordinate_columns(self.points, self.space)
         _validate_axis_metadata(self.space)
         _validate_indexing(self.space)
         _validate_point_bounds(self.points, self.space)
@@ -70,6 +85,42 @@ class PointCloudDataset:
         return summary
 
 
+@dataclass
+class VoxelMap:
+    """A voxelized spatial dataset together with its metadata.
+
+    The canonical in-memory axis order is ``data[x, y, z]`` so that voxel-map
+    indexing matches the package's explicit spatial metadata and point-cloud
+    coordinate conventions directly.
+    """
+
+    subject_name: str
+    data: np.ndarray
+    metadata: DatasetMetadata
+
+    @property
+    def space(self) -> SpaceDefinition:
+        """Convenience accessor for the voxel map spatial definition."""
+
+        return self.metadata.space
+
+    def summary(self) -> dict[str, Any]:
+        """Return a compact summary useful for QC and inspection."""
+
+        return {
+            "subject_name": self.subject_name,
+            "space_name": self.space.space_name,
+            "orientation": self.space.orientation,
+            "shape": tuple(int(v) for v in self.data.shape),
+            "dtype": str(self.data.dtype),
+            "representation_kind": self.metadata.representation.kind,
+            "representation_type": self.metadata.representation.representation_type,
+            "nonzero_voxels": int(np.count_nonzero(self.data)),
+            "sum": float(self.data.sum()),
+            "max": float(self.data.max()) if self.data.size else 0.0,
+        }
+
+
 def _infer_subject_name_from_pointcloud_path(csv_path: Path) -> str:
     """Infer a subject name from a standard point-cloud CSV filename."""
 
@@ -88,7 +139,20 @@ def _validate_required_columns(points: pd.DataFrame) -> None:
         raise ValueError(f"Point cloud is missing required columns: {missing}")
 
 
-def _validate_axis_metadata(space: PointCloudSpace) -> None:
+def _validate_spatial_coordinate_columns(
+    points: pd.DataFrame,
+    space: SpaceDefinition,
+) -> None:
+    """Check that the point table contains the spatial coordinate columns for the space."""
+
+    missing = [axis_label for axis_label in space.axis_labels if axis_label not in points.columns]
+    if missing:
+        raise ValueError(
+            f"Point table is missing required spatial coordinate columns: {missing}"
+        )
+
+
+def _validate_axis_metadata(space: SpaceDefinition) -> None:
     """Check that axis metadata lengths are internally consistent."""
 
     if len(space.axis_labels) != 3:
@@ -101,7 +165,7 @@ def _validate_axis_metadata(space: PointCloudSpace) -> None:
         )
 
 
-def _validate_indexing(space: PointCloudSpace) -> None:
+def _validate_indexing(space: SpaceDefinition) -> None:
     """Check that indexing is one of the supported conventions."""
 
     valid_indexing = {"one_based", "zero_based"}
@@ -111,7 +175,7 @@ def _validate_indexing(space: PointCloudSpace) -> None:
         )
 
 
-def _validate_point_bounds(points: pd.DataFrame, space: PointCloudSpace) -> None:
+def _validate_point_bounds(points: pd.DataFrame, space: SpaceDefinition) -> None:
     """Check that point coordinates fall within the declared space shape."""
 
     lower_bound = 1 if space.indexing == "one_based" else 0

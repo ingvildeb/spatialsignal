@@ -8,8 +8,8 @@ import numpy as np
 import pandas as pd
 from scipy.spatial import cKDTree
 
-from lsfm_cell_mapping.pointcloud.dataset import _validate_required_columns
-from lsfm_cell_mapping.pointcloud.metadata import PointCloudSpace
+from lsfm_cell_mapping.models.datasets import _validate_required_columns
+from lsfm_cell_mapping.models.metadata import SpaceDefinition
 
 
 EDGE_COLUMNS = [
@@ -63,7 +63,7 @@ def summarize_deduplication_result(
 
 def deduplicate_across_planes(
     points: pd.DataFrame,
-    space: PointCloudSpace,
+    space: SpaceDefinition,
     *,
     max_plane_offset: int,
     max_xy_distance_um: float,
@@ -97,7 +97,7 @@ def deduplicate_across_planes(
 
 def build_cross_plane_edge_table(
     points: pd.DataFrame,
-    space: PointCloudSpace,
+    space: SpaceDefinition,
     *,
     max_plane_offset: int,
     max_xy_distance_um: float,
@@ -251,7 +251,7 @@ def _xy_coordinate_columns(points: pd.DataFrame) -> tuple[str, str]:
     return x_coord, y_coord
 
 
-def _resolution_by_axis(space: PointCloudSpace) -> tuple[float, float, float]:
+def _resolution_by_axis(space: SpaceDefinition) -> tuple[float, float, float]:
     """Return x/y/z resolution in microns based on axis labels."""
 
     resolution_map = dict(zip(space.axis_labels, space.resolution_um, strict=True))

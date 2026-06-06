@@ -89,7 +89,7 @@ The cleaned objects JSON keeps the same spatial frame as the raw point cloud
 and also records a `processing` block containing:
 
 - `stage`
-- `source_pointcloud_csv`
+- `source_name`
 - `parameters`
 - `summary`
 

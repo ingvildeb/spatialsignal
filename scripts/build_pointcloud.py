@@ -39,7 +39,7 @@ def main() -> int:
     space_name = require_config_value(config, "space", "name")
     orientation = require_config_value(config, "space", "orientation")
     resolution_um = require_config_value(config, "space", "resolution_um")
-    representation_type = config.get("space", {}).get("representation_type", "point_centroids")
+    representation_type = config.get("data", {}).get("representation_type", "point_centroids")
 
     slice_start = int(config.get("processing", {}).get("slice_start", 1))
     one_based = bool(config.get("processing", {}).get("one_based", True))

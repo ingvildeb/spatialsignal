@@ -6,10 +6,13 @@ import pandas as pd
 import tifffile
 
 from lsfm_cell_mapping.pointcloud import (
+    DataRepresentation,
+    DatasetMetadata,
     POINTCLOUD_COLUMNS,
     POINTCLOUD_REQUIRED_COLUMNS,
     PointCloudDataset,
-    PointCloudSpace,
+    ProcessingProvenance,
+    SpaceDefinition,
     build_pointcloud_from_masks,
     extract_centroids_from_mask,
     extract_centroids_from_mask_stack,
@@ -178,51 +181,39 @@ def test_build_pointcloud_from_masks_writes_csv_and_space_json(tmp_path: Path) -
     assert list(pointcloud["detection_id"]) == [1, 2]
     with (out_dir / "Test_Subject_pointcloud_space.json").open("r", encoding="utf-8") as handle:
         metadata = json.load(handle)
-    assert metadata["representation_type"] == "point_centroids"
+    assert metadata["representation"]["kind"] == "point_cloud"
+    assert metadata["representation"]["representation_type"] == "point_centroids"
 
 
-def test_pointcloud_space_round_trip_json(tmp_path: Path) -> None:
-    space = PointCloudSpace(
-        schema_name="lsfm_cell_mapping.pointcloud_space",
+def test_dataset_metadata_round_trip_json(tmp_path: Path) -> None:
+    metadata = DatasetMetadata(
+        schema_name="lsfm_cell_mapping.dataset_metadata",
         schema_version="0.1.0",
-        space_name="subject_space",
-        orientation="las",
-        axis_labels=["x", "y", "z"],
-        indexing="one_based",
-        units="voxel",
-        shape=[10, 20, 30],
-        resolution_um=[1.8, 1.8, 5.0],
-        representation_type="point_centroids",
-        processing={
-            "stage": "deduplicate_across_planes",
-            "parameters": {"max_plane_offset": 1, "max_xy_distance_um": 3.0, "max_n_planes": 2},
-            "summary": {"raw_detections": 10, "cleaned_objects": 8, "accepted_edges": 2},
-        },
+        space=SpaceDefinition(
+            space_name="subject_space",
+            orientation="las",
+            axis_labels=["x", "y", "z"],
+            indexing="one_based",
+            units="voxel",
+            shape=[10, 20, 30],
+            resolution_um=[1.8, 1.8, 5.0],
+        ),
+        representation=DataRepresentation(
+            kind="point_cloud",
+            representation_type="point_centroids",
+        ),
+        processing=ProcessingProvenance(
+            stage="deduplicate_across_planes",
+            parameters={"max_plane_offset": 1, "max_xy_distance_um": 3.0, "max_n_planes": 2},
+            summary={"raw_detections": 10, "cleaned_objects": 8, "accepted_edges": 2},
+        ),
     )
 
     json_path = tmp_path / "space.json"
-    space.to_json(json_path)
-    loaded = PointCloudSpace.from_json(json_path)
+    metadata.to_json(json_path)
+    loaded = DatasetMetadata.from_json(json_path)
 
-    assert loaded == space
-
-
-def test_pointcloud_space_from_legacy_dict_defaults_representation_type() -> None:
-    legacy = {
-        "schema_name": "lsfm_cell_mapping.pointcloud_space",
-        "schema_version": "0.1.0",
-        "space_name": "subject_space",
-        "orientation": "las",
-        "axis_labels": ["x", "y", "z"],
-        "indexing": "one_based",
-        "units": "voxel",
-        "shape": [10, 20, 30],
-        "resolution_um": [1.8, 1.8, 5.0],
-    }
-
-    loaded = PointCloudSpace.from_dict(legacy)
-
-    assert loaded.representation_type == "point_centroids"
+    assert loaded == metadata
 
 
 def test_pointcloud_dataset_from_files_and_summary(tmp_path: Path) -> None:
@@ -237,17 +228,22 @@ def test_pointcloud_dataset_from_files_and_summary(tmp_path: Path) -> None:
         columns=POINTCLOUD_REQUIRED_COLUMNS,
     ).to_csv(csv_path, index=False)
 
-    PointCloudSpace(
-        schema_name="lsfm_cell_mapping.pointcloud_space",
+    DatasetMetadata(
+        schema_name="lsfm_cell_mapping.dataset_metadata",
         schema_version="0.1.0",
-        space_name="subject_space",
-        orientation="las",
-        axis_labels=["x", "y", "z"],
-        indexing="one_based",
-        units="voxel",
-        shape=[3, 3, 1],
-        resolution_um=[1.8, 1.8, 5.0],
-        representation_type="point_centroids",
+        space=SpaceDefinition(
+            space_name="subject_space",
+            orientation="las",
+            axis_labels=["x", "y", "z"],
+            indexing="one_based",
+            units="voxel",
+            shape=[3, 3, 1],
+            resolution_um=[1.8, 1.8, 5.0],
+        ),
+        representation=DataRepresentation(
+            kind="point_cloud",
+            representation_type="point_centroids",
+        ),
     ).to_json(json_path)
 
     dataset = PointCloudDataset.from_files(csv_path, json_path)
@@ -259,6 +255,7 @@ def test_pointcloud_dataset_from_files_and_summary(tmp_path: Path) -> None:
     assert summary["space_name"] == "subject_space"
     assert summary["x_min"] == 2
     assert summary["y_max"] == 3
+    assert dataset.metadata.representation.kind == "point_cloud"
 
 
 def test_pointcloud_dataset_validate_raises_for_out_of_bounds_points(tmp_path: Path) -> None:
@@ -272,17 +269,22 @@ def test_pointcloud_dataset_validate_raises_for_out_of_bounds_points(tmp_path: P
         columns=POINTCLOUD_REQUIRED_COLUMNS,
     ).to_csv(csv_path, index=False)
 
-    PointCloudSpace(
-        schema_name="lsfm_cell_mapping.pointcloud_space",
+    DatasetMetadata(
+        schema_name="lsfm_cell_mapping.dataset_metadata",
         schema_version="0.1.0",
-        space_name="subject_space",
-        orientation="las",
-        axis_labels=["x", "y", "z"],
-        indexing="one_based",
-        units="voxel",
-        shape=[3, 3, 1],
-        resolution_um=[1.8, 1.8, 5.0],
-        representation_type="point_centroids",
+        space=SpaceDefinition(
+            space_name="subject_space",
+            orientation="las",
+            axis_labels=["x", "y", "z"],
+            indexing="one_based",
+            units="voxel",
+            shape=[3, 3, 1],
+            resolution_um=[1.8, 1.8, 5.0],
+        ),
+        representation=DataRepresentation(
+            kind="point_cloud",
+            representation_type="point_centroids",
+        ),
     ).to_json(json_path)
 
     dataset = PointCloudDataset.from_files(csv_path, json_path)
@@ -307,17 +309,22 @@ def _make_valid_dataset_files(tmp_path: Path) -> tuple[Path, Path]:
         columns=POINTCLOUD_REQUIRED_COLUMNS,
     ).to_csv(csv_path, index=False)
 
-    PointCloudSpace(
-        schema_name="lsfm_cell_mapping.pointcloud_space",
+    DatasetMetadata(
+        schema_name="lsfm_cell_mapping.dataset_metadata",
         schema_version="0.1.0",
-        space_name="subject_space",
-        orientation="las",
-        axis_labels=["x", "y", "z"],
-        indexing="one_based",
-        units="voxel",
-        shape=[3, 3, 1],
-        resolution_um=[1.8, 1.8, 5.0],
-        representation_type="point_centroids",
+        space=SpaceDefinition(
+            space_name="subject_space",
+            orientation="las",
+            axis_labels=["x", "y", "z"],
+            indexing="one_based",
+            units="voxel",
+            shape=[3, 3, 1],
+            resolution_um=[1.8, 1.8, 5.0],
+        ),
+        representation=DataRepresentation(
+            kind="point_cloud",
+            representation_type="point_centroids",
+        ),
     ).to_json(json_path)
 
     return csv_path, json_path
@@ -345,17 +352,22 @@ def test_dataset_columns_invalid(tmp_path: Path) -> None:
 def test_dataset_axis_metadata_invalid(tmp_path: Path) -> None:
     csv_path, json_path = _make_valid_dataset_files(tmp_path)
 
-    PointCloudSpace(
-        schema_name="lsfm_cell_mapping.pointcloud_space",
+    DatasetMetadata(
+        schema_name="lsfm_cell_mapping.dataset_metadata",
         schema_version="0.1.0",
-        space_name="subject_space",
-        orientation="las",
-        axis_labels=["x", "y"],
-        indexing="one_based",
-        units="voxel",
-        shape=[3, 3, 1],
-        resolution_um=[1.8, 1.8, 5.0],
-        representation_type="point_centroids",
+        space=SpaceDefinition(
+            space_name="subject_space",
+            orientation="las",
+            axis_labels=["x", "y"],
+            indexing="one_based",
+            units="voxel",
+            shape=[3, 3, 1],
+            resolution_um=[1.8, 1.8, 5.0],
+        ),
+        representation=DataRepresentation(
+            kind="point_cloud",
+            representation_type="point_centroids",
+        ),
     ).to_json(json_path)
 
     dataset = PointCloudDataset.from_files(csv_path, json_path)
@@ -371,17 +383,22 @@ def test_dataset_axis_metadata_invalid(tmp_path: Path) -> None:
 def test_dataset_indexing_invalid(tmp_path: Path) -> None:
     csv_path, json_path = _make_valid_dataset_files(tmp_path)
 
-    PointCloudSpace(
-        schema_name="lsfm_cell_mapping.pointcloud_space",
+    DatasetMetadata(
+        schema_name="lsfm_cell_mapping.dataset_metadata",
         schema_version="0.1.0",
-        space_name="subject_space",
-        orientation="las",
-        axis_labels=["x", "y", "z"],
-        indexing="bad_mode",
-        units="voxel",
-        shape=[3, 3, 1],
-        resolution_um=[1.8, 1.8, 5.0],
-        representation_type="point_centroids",
+        space=SpaceDefinition(
+            space_name="subject_space",
+            orientation="las",
+            axis_labels=["x", "y", "z"],
+            indexing="bad_mode",
+            units="voxel",
+            shape=[3, 3, 1],
+            resolution_um=[1.8, 1.8, 5.0],
+        ),
+        representation=DataRepresentation(
+            kind="point_cloud",
+            representation_type="point_centroids",
+        ),
     ).to_json(json_path)
 
     dataset = PointCloudDataset.from_files(csv_path, json_path)

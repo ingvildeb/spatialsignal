@@ -65,20 +65,26 @@ but those IDs are not used for Python-vs-MATLAB coordinate matching.
 Centroid images are quality-control outputs only. They are derived from the
 point table and should not be treated as the primary data source.
 
-## Point-Cloud Space Metadata
+## Point-Cloud Metadata
 
-Milestone 1 writes a sidecar JSON next to each point-cloud CSV. The JSON should
-store metadata describing both the point cloud's spatial frame and what the
-rows represent, such as:
+Milestone 1 writes a sidecar JSON next to each point-cloud CSV. The canonical
+JSON schema is nested and separates:
 
-- `space_name`
-- `orientation`
-- `representation_type`
-- `axis_labels`
-- `indexing`
-- `units`
-- `shape`
-- `resolution_um`
+- `space`
+  - spatial/grid definition such as:
+    - `space_name`
+    - `orientation`
+    - `axis_labels`
+    - `indexing`
+    - `units`
+    - `shape`
+    - `resolution_um`
+- `representation`
+  - dataset-level semantic fields such as:
+    - `kind`
+    - `representation_type`
+- `processing`
+  - optional provenance for derived outputs
 
 For raw subject image space, the recommended axis labels are:
 
@@ -88,6 +94,20 @@ For raw subject image space, the recommended axis labels are:
 
 and the orientation should use a BrainGlobe-style code such as `las` where
 voxel `[0, 0, 0]` is left, anterior, and superior.
+
+In this package, that orientation string follows the BrainGlobe origin
+convention:
+
+- each letter describes the anatomical side at voxel index `0` for that axis
+- it does **not** describe the direction of increasing voxel indices
+
+So for `las`:
+
+- voxel `[0, 0, 0]` is left, anterior, superior
+- increasing indices move:
+  - `x`: left -> right
+  - `y`: anterior -> posterior
+  - `z`: superior -> inferior
 
 For the current cell-body workflow, the recommended representation type is:
 
@@ -110,7 +130,7 @@ What changes is the identity of each row:
   across one or more nearby planes
 
 The cleaned objects JSON therefore keeps the same spatial metadata fields and
-adds a `processing` section describing how the deduplication output was
+keeps the same `space` section while adding a `processing` section describing how the deduplication output was
 derived.
 
 ## Future Coordinate Spaces
@@ -123,3 +143,41 @@ Later milestones will add explicit support for additional spaces such as:
 
 Those spaces should be represented explicitly rather than inferred from file
 names or directory structure.
+
+## Voxel Map Axis Order
+
+Internally, voxel maps follow the same explicit spatial axis convention as
+point clouds and metadata:
+
+- voxel arrays are indexed as `data[x, y, z]`
+- `space.shape` is interpreted in the same `x, y, z` order
+- `axis_labels` and `orientation` therefore describe the in-memory voxel map
+  directly
+
+This is a deliberate package convention. It favors clear spatial reasoning and
+consistency with the canonical point-cloud columns over image-stack or
+matrix-style indexing conventions.
+
+Some external image-oriented tools and array libraries commonly treat 3D arrays
+as `z, y, x` because they extend 2D row/column indexing (`y, x`) by adding the
+slice axis first. `lsfm_cell_mapping` does **not** use that convention
+internally.
+
+When voxel maps are later exported to formats or libraries that expect
+image-style axis order, any required permutation should happen explicitly at the
+I/O boundary rather than silently inside the core spatial model.
+
+## NIfTI Export Orientation
+
+When writing NIfTI outputs, the package converts from the repo's BrainGlobe
+origin-based orientation convention into NIfTI's affine-based RAS world
+convention explicitly.
+
+This means:
+
+- `orientation` in `SpaceDefinition` still means "where voxel index 0 is"
+- the NIfTI affine then encodes the resulting directions of increasing voxel
+  indices in an RAS+ world
+
+Those are related conventions, but they are not the same thing, so they should
+not be interpreted interchangeably.

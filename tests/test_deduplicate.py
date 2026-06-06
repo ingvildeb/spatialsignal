@@ -2,8 +2,8 @@ import pandas as pd
 
 from lsfm_cell_mapping.pointcloud import (
     CLEANED_OBJECT_REQUIRED_COLUMNS,
+    SpaceDefinition,
     EDGE_COLUMNS,
-    PointCloudSpace,
     deduplicate_across_planes,
     summarize_deduplication_result,
 )
@@ -21,9 +21,7 @@ def test_deduplicate_across_planes_builds_expected_edges_membership_and_objects(
         ]
     )
 
-    space = PointCloudSpace(
-        schema_name="lsfm_cell_mapping.pointcloud_space",
-        schema_version="0.1.0",
+    space = SpaceDefinition(
         space_name="subject_space",
         orientation="las",
         axis_labels=["x", "y", "z"],
@@ -31,7 +29,6 @@ def test_deduplicate_across_planes_builds_expected_edges_membership_and_objects(
         units="voxel",
         shape=[500, 500, 20],
         resolution_um=[1.0, 1.0, 5.0],
-        representation_type="point_centroids",
     )
 
     result = deduplicate_across_planes(
@@ -140,9 +137,7 @@ def test_deduplicate_across_planes_falls_back_to_integer_coordinates_when_float_
         ]
     )
 
-    space = PointCloudSpace(
-        schema_name="lsfm_cell_mapping.pointcloud_space",
-        schema_version="0.1.0",
+    space = SpaceDefinition(
         space_name="subject_space",
         orientation="las",
         axis_labels=["x", "y", "z"],
@@ -150,7 +145,6 @@ def test_deduplicate_across_planes_falls_back_to_integer_coordinates_when_float_
         units="voxel",
         shape=[20, 20, 5],
         resolution_um=[1.0, 1.0, 5.0],
-        representation_type="point_centroids",
     )
 
     result = deduplicate_across_planes(
@@ -174,9 +168,7 @@ def test_deduplicate_across_planes_max_n_planes_cap_blocks_three_plane_chain() -
         ]
     )
 
-    space = PointCloudSpace(
-        schema_name="lsfm_cell_mapping.pointcloud_space",
-        schema_version="0.1.0",
+    space = SpaceDefinition(
         space_name="subject_space",
         orientation="las",
         axis_labels=["x", "y", "z"],
@@ -184,7 +176,6 @@ def test_deduplicate_across_planes_max_n_planes_cap_blocks_three_plane_chain() -
         units="voxel",
         shape=[500, 500, 20],
         resolution_um=[1.0, 1.0, 20.0],
-        representation_type="point_centroids",
     )
 
     result = deduplicate_across_planes(
@@ -233,9 +224,7 @@ def test_summarize_deduplication_result_reports_minimal_counts() -> None:
         ]
     )
 
-    space = PointCloudSpace(
-        schema_name="lsfm_cell_mapping.pointcloud_space",
-        schema_version="0.1.0",
+    space = SpaceDefinition(
         space_name="subject_space",
         orientation="las",
         axis_labels=["x", "y", "z"],
@@ -243,7 +232,6 @@ def test_summarize_deduplication_result_reports_minimal_counts() -> None:
         units="voxel",
         shape=[20, 20, 5],
         resolution_um=[1.0, 1.0, 5.0],
-        representation_type="point_centroids",
     )
     result = deduplicate_across_planes(
         points,
