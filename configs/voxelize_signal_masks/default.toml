@@ -1,0 +1,24 @@
+[subject]
+name = "Example_Subject"
+
+[input]
+mask_dir = 'Z:\Labmembers\Ingvild\RM1\microglia_ramification_model\analysis_test\100361\ramification_minus_soma'
+pattern = "*.tif*"
+
+[output]
+out_dir = 'C:\Users\SmartBrain_32C_TR\Documents\GitHub\standard_test_data\lsfm_cell_mapping\voxelize_signal_masks\100361'
+
+[space]
+name = "subject_space"
+orientation = "las"
+resolution_um = [1.8, 1.8, 20.0]
+indexing = "one_based"
+
+[analysis]
+space_name = "subject_analysis_space"
+resolution_um = [20.0, 20.0, 20.0]
+
+[processing]
+show_progress = true
+progress_interval = 25
+

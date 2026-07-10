@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import tifffile
 
 from lsfm_cell_mapping.models import (
     DataRepresentation,
@@ -9,8 +10,11 @@ from lsfm_cell_mapping.models import (
 )
 from lsfm_cell_mapping.voxelization import (
     build_nifti_ras_affine,
+    build_fraction_map_from_counts,
+    compute_native_voxel_denominator_grid,
     make_subject_analysis_space,
     pointcloud_to_zero_based_xyz,
+    voxelize_signal_masks_to_fraction_map,
     voxelize_point_centroids_to_count_map,
     voxelize_to_space,
 )
@@ -279,3 +283,233 @@ def test_build_nifti_ras_affine_handles_nontrivial_axis_world_mapping() -> None:
         ]
     )
     np.testing.assert_array_equal(affine, expected)
+
+
+def test_compute_native_voxel_denominator_grid_uniform_case() -> None:
+    source_space = SpaceDefinition(
+        space_name="native_space",
+        orientation="las",
+        axis_labels=["x", "y", "z"],
+        indexing="one_based",
+        units="voxel",
+        shape=[4, 4, 1],
+        resolution_um=[1.0, 1.0, 1.0],
+    )
+    target_space = SpaceDefinition(
+        space_name="subject_analysis_space",
+        orientation="las",
+        axis_labels=["x", "y", "z"],
+        indexing="zero_based",
+        units="voxel",
+        shape=[2, 2, 1],
+        resolution_um=[2.0, 2.0, 1.0],
+    )
+
+    denominator = compute_native_voxel_denominator_grid(source_space, target_space)
+
+    expected = np.full((2, 2, 1), 4, dtype=np.uint32)
+    np.testing.assert_array_equal(denominator, expected)
+
+
+def test_compute_native_voxel_denominator_grid_edge_case() -> None:
+    source_space = SpaceDefinition(
+        space_name="native_space",
+        orientation="las",
+        axis_labels=["x", "y", "z"],
+        indexing="one_based",
+        units="voxel",
+        shape=[5, 5, 1],
+        resolution_um=[1.0, 1.0, 1.0],
+    )
+    target_space = make_subject_analysis_space(
+        source_space,
+        analysis_resolution_um=[2.0, 2.0, 1.0],
+    )
+
+    denominator = compute_native_voxel_denominator_grid(source_space, target_space)
+
+    expected = np.array(
+        [
+            [[4], [4], [2]],
+            [[4], [4], [2]],
+            [[2], [2], [1]],
+        ],
+        dtype=np.uint32,
+    )
+    np.testing.assert_array_equal(denominator, expected)
+
+
+def test_build_fraction_map_from_counts() -> None:
+    signal_counts = np.array(
+        [
+            [[3], [2]],
+            [[2], [3]],
+        ],
+        dtype=np.uint32,
+    )
+    denominators = np.full((2, 2, 1), 4, dtype=np.uint32)
+
+    fraction_map = build_fraction_map_from_counts(signal_counts, denominators)
+
+    expected = np.array(
+        [
+            [[0.75], [0.5]],
+            [[0.5], [0.75]],
+        ],
+        dtype=np.float32,
+    )
+    np.testing.assert_allclose(fraction_map, expected)
+
+
+def test_voxelize_signal_masks_to_fraction_map_toy_case(tmp_path) -> None:
+    slice0 = np.array(
+        [
+            [1, 1, 0, 0],
+            [1, 0, 1, 1],
+            [0, 0, 1, 0],
+            [1, 1, 1, 1],
+        ],
+        dtype=np.uint8,
+    )
+    mask_path = tmp_path / "mask_0000.tif"
+    tifffile.imwrite(mask_path, slice0)
+
+    source_space = SpaceDefinition(
+        space_name="native_space",
+        orientation="las",
+        axis_labels=["x", "y", "z"],
+        indexing="one_based",
+        units="voxel",
+        shape=[4, 4, 1],
+        resolution_um=[1.0, 1.0, 1.0],
+    )
+    target_space = SpaceDefinition(
+        space_name="subject_analysis_space",
+        orientation="las",
+        axis_labels=["x", "y", "z"],
+        indexing="zero_based",
+        units="voxel",
+        shape=[2, 2, 1],
+        resolution_um=[2.0, 2.0, 1.0],
+    )
+
+    voxel_map = voxelize_signal_masks_to_fraction_map(
+        [mask_path],
+        source_space,
+        target_space,
+        subject_name="Example_Subject",
+    )
+
+    expected = np.array(
+        [
+            [[0.75], [0.5]],
+            [[0.5], [0.75]],
+        ],
+        dtype=np.float32,
+    )
+    np.testing.assert_allclose(voxel_map.data, expected)
+    assert voxel_map.metadata.representation.kind == "voxel_map"
+    assert voxel_map.metadata.representation.representation_type == "fraction_map"
+    assert voxel_map.metadata.processing is not None
+    assert voxel_map.metadata.processing.summary["input_signal_points"] == 10
+    assert voxel_map.metadata.processing.summary["sum_signal_counts"] == 10
+
+
+def test_voxelize_signal_masks_to_fraction_map_empty_signal(tmp_path) -> None:
+    empty_slice = np.zeros((4, 4), dtype=np.uint8)
+    mask_path = tmp_path / "mask_0000.tif"
+    tifffile.imwrite(mask_path, empty_slice)
+
+    source_space = SpaceDefinition(
+        space_name="native_space",
+        orientation="las",
+        axis_labels=["x", "y", "z"],
+        indexing="one_based",
+        units="voxel",
+        shape=[4, 4, 1],
+        resolution_um=[1.0, 1.0, 1.0],
+    )
+    target_space = SpaceDefinition(
+        space_name="subject_analysis_space",
+        orientation="las",
+        axis_labels=["x", "y", "z"],
+        indexing="zero_based",
+        units="voxel",
+        shape=[2, 2, 1],
+        resolution_um=[2.0, 2.0, 1.0],
+    )
+
+    voxel_map = voxelize_signal_masks_to_fraction_map(
+        [mask_path],
+        source_space,
+        target_space,
+        subject_name="Example_Subject",
+    )
+
+    expected = np.zeros((2, 2, 1), dtype=np.float32)
+    np.testing.assert_array_equal(voxel_map.data, expected)
+    assert not np.isnan(voxel_map.data).any()
+    assert voxel_map.metadata.processing is not None
+    assert voxel_map.metadata.processing.summary["input_signal_points"] == 0
+    assert voxel_map.metadata.processing.summary["sum_signal_counts"] == 0
+
+
+def test_voxelize_signal_masks_to_fraction_map_preserves_signal_count_in_numerator(
+    tmp_path,
+) -> None:
+    slice0 = np.array(
+        [
+            [1, 0, 1, 0],
+            [0, 1, 0, 1],
+            [0, 0, 0, 0],
+            [1, 1, 0, 0],
+        ],
+        dtype=np.uint8,
+    )
+    slice1 = np.array(
+        [
+            [0, 1, 0, 1],
+            [1, 0, 0, 0],
+            [0, 0, 1, 1],
+            [0, 0, 0, 0],
+        ],
+        dtype=np.uint8,
+    )
+    mask_paths = [tmp_path / "mask_0000.tif", tmp_path / "mask_0001.tif"]
+    tifffile.imwrite(mask_paths[0], slice0)
+    tifffile.imwrite(mask_paths[1], slice1)
+
+    source_space = SpaceDefinition(
+        space_name="native_space",
+        orientation="las",
+        axis_labels=["x", "y", "z"],
+        indexing="one_based",
+        units="voxel",
+        shape=[4, 4, 2],
+        resolution_um=[1.0, 1.0, 1.0],
+    )
+    target_space = SpaceDefinition(
+        space_name="subject_analysis_space",
+        orientation="las",
+        axis_labels=["x", "y", "z"],
+        indexing="zero_based",
+        units="voxel",
+        shape=[2, 2, 2],
+        resolution_um=[2.0, 2.0, 1.0],
+    )
+
+    voxel_map = voxelize_signal_masks_to_fraction_map(
+        mask_paths,
+        source_space,
+        target_space,
+        subject_name="Example_Subject",
+    )
+
+    total_signal_points = int(slice0.sum() + slice1.sum())
+    denominator = compute_native_voxel_denominator_grid(source_space, target_space)
+    recovered_numerator = voxel_map.data * denominator.astype(np.float32)
+
+    assert voxel_map.metadata.processing is not None
+    assert voxel_map.metadata.processing.summary["input_signal_points"] == total_signal_points
+    assert voxel_map.metadata.processing.summary["sum_signal_counts"] == total_signal_points
+    assert int(np.rint(recovered_numerator.sum())) == total_signal_points

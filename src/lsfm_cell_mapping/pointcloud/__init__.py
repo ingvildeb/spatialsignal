@@ -1,6 +1,6 @@
 """Point-cloud construction utilities."""
 
-from .build import build_pointcloud_from_masks
+from .build import build_pointcloud_from_masks, build_signal_points_from_masks
 from .centroids import (
     POINTCLOUD_COLUMNS,
     POINTCLOUD_OPTIONAL_COLUMNS,
@@ -8,6 +8,11 @@ from .centroids import (
     extract_centroids_from_mask,
     extract_centroids_from_mask_stack,
     matlab_round,
+)
+from .signal_points import (
+    SIGNAL_POINT_REQUIRED_COLUMNS,
+    extract_signal_points_from_mask,
+    extract_signal_points_from_mask_stack,
 )
 from lsfm_cell_mapping.models.datasets import PointCloudDataset
 from .deduplicate import (
@@ -38,9 +43,11 @@ from .validate import (
 
 __all__ = [
     "build_pointcloud_from_masks",
+    "build_signal_points_from_masks",
     "POINTCLOUD_COLUMNS",
     "POINTCLOUD_OPTIONAL_COLUMNS",
     "POINTCLOUD_REQUIRED_COLUMNS",
+    "SIGNAL_POINT_REQUIRED_COLUMNS",
     "PointCloudDataset",
     "DataRepresentation",
     "DatasetMetadata",
@@ -58,6 +65,8 @@ __all__ = [
     "deduplicate_across_planes",
     "extract_centroids_from_mask",
     "extract_centroids_from_mask_stack",
+    "extract_signal_points_from_mask",
+    "extract_signal_points_from_mask_stack",
     "load_canonical_pointcloud_csv",
     "load_legacy_matlab_centroids_csv",
     "matlab_round",
