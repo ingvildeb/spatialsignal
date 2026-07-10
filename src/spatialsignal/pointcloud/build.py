@@ -3,25 +3,16 @@
 from __future__ import annotations
 
 from pathlib import Path
-import re
 
 import pandas as pd
 
 from spatialsignal.io.masks import find_mask_files
+from spatialsignal.io.outputs import make_subject_output_stem
+from spatialsignal.models.metadata import DatasetMetadata
+from spatialsignal.pointcloud._indexing import resolve_slice_start, validate_indexing
 from spatialsignal.pointcloud.centroids import extract_centroids_from_mask_stack
 from spatialsignal.pointcloud.signal_points import extract_signal_points_from_mask_stack
-from spatialsignal.models.metadata import DatasetMetadata
 from spatialsignal.qc import write_centroid_images
-
-
-def make_subject_output_stem(subject_name: str) -> str:
-    """Convert a subject name into a filesystem-friendly output stem."""
-
-    normalized = re.sub(r"[^A-Za-z0-9_]+", "_", subject_name.strip())
-    normalized = re.sub(r"_+", "_", normalized).strip("_")
-    if not normalized:
-        raise ValueError("subject_name must contain at least one alphanumeric character")
-    return normalized
 
 
 def build_pointcloud_from_masks(
@@ -34,14 +25,17 @@ def build_pointcloud_from_masks(
     resolution_um: list[float],
     representation_type: str = "point_centroids",
     pattern: str = "masks_*.tif*",
-    slice_start: int = 1,
-    one_based: bool = True,
+    indexing: str = "zero_based",
+    slice_start: int | None = None,
     max_workers: int | None = 1,
     write_qc_images: bool = False,
     show_progress: bool = False,
     progress_interval: int = 25,
 ) -> pd.DataFrame:
     """Build and export a canonical point cloud from a stack of mask images."""
+
+    indexing = validate_indexing(indexing)
+    resolved_slice_start = resolve_slice_start(indexing, slice_start)
 
     mask_files = find_mask_files(mask_dir, pattern=pattern)
     output_stem = make_subject_output_stem(subject_name)
@@ -52,8 +46,8 @@ def build_pointcloud_from_masks(
         print(f"Found {len(mask_files)} mask slices in {mask_dir}")
     pointcloud = extract_centroids_from_mask_stack(
         mask_files,
-        slice_start=slice_start,
-        one_based=one_based,
+        indexing=indexing,
+        slice_start=resolved_slice_start,
         max_workers=max_workers,
         show_progress=show_progress,
         progress_interval=progress_interval,
@@ -65,7 +59,7 @@ def build_pointcloud_from_masks(
         space_name=space_name,
         orientation=orientation,
         resolution_um=resolution_um,
-        indexing="one_based" if one_based else "zero_based",
+        indexing=indexing,
         mask_files=mask_files,
         representation_type=representation_type,
     )
@@ -80,7 +74,8 @@ def build_pointcloud_from_masks(
             mask_files,
             pointcloud,
             out_dir,
-            one_based=one_based,
+            indexing=indexing,
+            slice_start=resolved_slice_start,
         )
         if show_progress:
             print(f"Wrote centroid QC images to {out_dir}")
@@ -96,13 +91,16 @@ def build_signal_points_from_masks(
     orientation: str,
     resolution_um: list[float],
     pattern: str = "*.tif*",
-    slice_start: int = 1,
-    one_based: bool = True,
+    indexing: str = "zero_based",
+    slice_start: int | None = None,
     max_workers: int | None = 1,
     show_progress: bool = False,
     progress_interval: int = 25,
 ) -> pd.DataFrame:
     """Build and export signal-support points from a stack of binary mask images."""
+
+    indexing = validate_indexing(indexing)
+    resolved_slice_start = resolve_slice_start(indexing, slice_start)
 
     mask_files = find_mask_files(mask_dir, pattern=pattern)
     output_stem = make_subject_output_stem(subject_name)
@@ -113,8 +111,8 @@ def build_signal_points_from_masks(
         print(f"Found {len(mask_files)} mask slices in {mask_dir}")
     signal_points = extract_signal_points_from_mask_stack(
         mask_files,
-        slice_start=slice_start,
-        one_based=one_based,
+        indexing=indexing,
+        slice_start=resolved_slice_start,
         max_workers=max_workers,
         show_progress=show_progress,
         progress_interval=progress_interval,
@@ -126,7 +124,7 @@ def build_signal_points_from_masks(
         space_name=space_name,
         orientation=orientation,
         resolution_um=resolution_um,
-        indexing="one_based" if one_based else "zero_based",
+        indexing=indexing,
         mask_files=mask_files,
         representation_type="signal_points",
     )

@@ -44,10 +44,18 @@ def find_mask_files(mask_dir: Path, pattern: str = "masks_*.tif*") -> list[Path]
     return list(mask_files)
 
 
-def assign_slices(mask_files: list[Path], slice_start: int = 1) -> list[tuple[int, Path]]:
-    """Assign sequential slice indices to a sorted mask stack."""
+def assign_slices(mask_files: list[Path], slice_start: int = 0) -> list[tuple[int, Path]]:
+    """Assign sequential slice indices to a sorted mask stack.
 
-    if slice_start < 1:
-        raise ValueError(f"slice_start must be >= 1, got {slice_start}")
+    This helper only enumerates files in order. Higher-level callers decide
+    whether ``0`` or ``1`` is the meaningful default for a given indexing
+    convention.
+    """
 
-    return [(slice_index, mask_path) for slice_index, mask_path in enumerate(mask_files, start=slice_start)]
+    if slice_start < 0:
+        raise ValueError(f"slice_start must be >= 0, got {slice_start}")
+
+    return [
+        (slice_index, mask_path)
+        for slice_index, mask_path in enumerate(mask_files, start=slice_start)
+    ]

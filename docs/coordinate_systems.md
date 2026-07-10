@@ -1,8 +1,8 @@
 # Coordinate Systems
 
-## Canonical Milestone 1 Coordinates
+## Canonical Subject-Space Coordinates
 
-The canonical point-cloud table for milestone 1 uses the following columns:
+The canonical point-cloud table uses the following columns:
 
 - `detection_id`: dataset-wide unique identifier for one raw 2D detection
 - `seg_num`: label ID from the 2D Cellpose mask image
@@ -10,9 +10,9 @@ The canonical point-cloud table for milestone 1 uses the following columns:
 - `y`: image vertical coordinate
 - `z`: sequential slice index assigned from the natural sort order of mask files
 
-These coordinates describe image-space positions only. They do not yet encode
-anatomical orientation directly in the table itself. Instead, those properties should
-be recorded in a point-cloud space metadata JSON written alongside the CSV.
+These coordinates describe image-space positions only. They do not encode anatomical orientation
+inside the table itself. Instead, orientation and resolution are recorded in the metadata JSON
+written alongside the CSV.
 
 For the current subject-space pipeline:
 
@@ -20,13 +20,18 @@ For the current subject-space pipeline:
 - `y` corresponds to image rows
 - `z` corresponds to slice order in the stack
 
-This means the canonical table is now expressed directly in image-axis terms
-rather than raw row/column naming.
+This means the canonical table is expressed directly in image-axis terms rather than raw
+row/column naming.
 
-## Indexing Convention
+## Canonical Indexing Convention
 
-Exported coordinates are intended to match the legacy MATLAB workflow and are
-therefore treated as 1-based indices in milestone 1 outputs.
+`spatialsignal` treats zero-based indexing as the canonical default for new outputs.
+
+That means:
+
+- `x = 0` is the first image column
+- `y = 0` is the first image row
+- `z = 0` is the first slice
 
 ## Slice Assignment
 
@@ -34,72 +39,35 @@ Slice numbering is defined by naturally sorted mask-file order:
 
 1. Find all files matching the configured mask pattern.
 2. Sort them with natural sorting.
-3. Assign slices sequentially from `slice_start`.
-
-This intentionally avoids dependence on filename-derived z parsing rules.
+3. Assign slices sequentially.
 
 ## Relationship to the Legacy MATLAB CSV
 
-The MATLAB pipeline writes a file named `centroids.csv` with columns
-`seg_num,x,y,z`, but the stored values are actually:
+The relationship to the legacy MATLAB workflow of te Kim lab is documented separately in
+`docs/legacy_matlab_relationship.md`.
 
-- `seg_num`
-- centroid row
-- centroid column
-- slice index
+The short version is:
 
-In other words, the legacy `x` and `y` headers do not match the underlying
-image-coordinate meaning. During validation, the Python package remaps:
-
-- legacy MATLAB `x` -> canonical `y`
-- legacy MATLAB `y` -> canonical `x`
-- legacy MATLAB `z` -> canonical `z`
-
-The MATLAB format should therefore be treated as a legacy compatibility target,
-not as the canonical schema. When loading legacy MATLAB CSVs into the current
-schema, the Python package assigns synthetic sequential `detection_id` values,
-but those IDs are not used for Python-vs-MATLAB coordinate matching.
-
-## Centroid Images
-
-Centroid images are quality-control outputs only. They are derived from the
-point table and should not be treated as the primary data source.
+- the MATLAB CSV is a compatibility and validation target
+- it is not the canonical schema for new `spatialsignal` outputs
+- `one_based` indexing should be chosen only when reproducing or checking against that workflow
 
 ## Point-Cloud Metadata
 
-Milestone 1 writes a sidecar JSON next to each point-cloud CSV. The canonical
-JSON schema is nested and separates:
+Each point-cloud CSV is accompanied by a nested metadata JSON that separates:
 
 - `space`
-  - spatial/grid definition such as:
-    - `space_name`
-    - `orientation`
-    - `axis_labels`
-    - `indexing`
-    - `units`
-    - `shape`
-    - `resolution_um`
+  - spatial/grid definition such as `space_name`, `orientation`, `axis_labels`, `indexing`,
+    `units`, `shape`, and `resolution_um`
 - `representation`
-  - dataset-level semantic fields such as:
-    - `kind`
-    - `representation_type`
+  - dataset-level semantic fields such as `kind` and `representation_type`
 - `processing`
   - optional provenance for derived outputs
 
-For raw subject image space, the recommended axis labels are:
+For raw subject image space, the recommended axis labels are `x`, `y`, and `z`, and the
+orientation should use a BrainGlobe-style code such as `las`.
 
-- `x`
-- `y`
-- `z`
-
-and the orientation should use a BrainGlobe-style code such as `las` where
-voxel `[0, 0, 0]` is left, anterior, and superior.
-
-In this package, that orientation string follows the BrainGlobe origin
-convention:
-
-- each letter describes the anatomical side at voxel index `0` for that axis
-- it does **not** describe the direction of increasing voxel indices
+In this package, the orientation string follows the BrainGlobe origin convention where each letter describes the anatomical side at voxel index `0` for that axis.
 
 So for `las`:
 
@@ -109,75 +77,94 @@ So for `las`:
   - `y`: anterior -> posterior
   - `z`: superior -> inferior
 
-For the current cell-body workflow, the recommended representation type is:
+## Representation Types
 
-- `point_centroids`
+For the current workflows, the main representation types are:
 
-This distinguishes centroid-based instance summaries from future coordinate
-tables such as dense signal-support points (`signal_points`) or skeletonized
-ramification coordinates (`skeleton_points`).
+- `point_centroids`: one row per centroid-like instance summary
+- `signal_points`: one row per signal-support point from a binary semantic mask
+- `count_map`: a voxelized count representation
+- `fraction_map`: a voxelized semantic support fraction representation
 
 ## Cleaned Object Outputs
 
-Cross-plane deduplication does not change the spatial frame of the data. The
-cleaned object outputs remain in the same `x,y,z` image-axis convention and use
-the same point-cloud space definition as the raw detections.
+Cross-plane deduplication does not change the spatial frame of the data. Cleaned object outputs
+remain in the same `x,y,z` image-axis convention and use the same point-cloud space definition as
+raw detections.
 
 What changes is the identity of each row:
 
 - raw point cloud: one row = one 2D detection in one plane
-- cleaned object point cloud: one row = one deduplicated object aggregated
-  across one or more nearby planes
+- cleaned object point cloud: one row = one deduplicated object aggregated across one or more
+  nearby planes
 
-The cleaned objects JSON therefore keeps the same spatial metadata fields and
-keeps the same `space` section while adding a `processing` section describing how the deduplication output was
-derived.
+The cleaned objects JSON therefore keeps the same spatial metadata fields while adding a
+`processing` section describing how the derived output was created.
 
-## Future Coordinate Spaces
+## Subject-Space Quantification vs Reference-Space Maps
 
-Later milestones will add explicit support for additional spaces such as:
+The current package strategy distinguishes clearly between subject-space quantitative outputs and
+reference-space aligned maps.
 
-- downsampled subject voxel space
-- age-specific reference atlas spaces
-- Allen CCFv3
+### Subject-Space Quantification
 
-Those spaces should be represented explicitly rather than inferred from file
-names or directory structure.
+Subject-space quantification is intended to be the canonical biological output.
 
-## Voxel Map Axis Order
+The planned atlas-aware workflow is:
 
-Internally, voxel maps follow the same explicit spatial axis convention as
-point clouds and metadata:
+1. start from subject-space objects or voxel maps
+2. consume an `atlasspace` registration output folder
+3. use the warped annotation in subject space
+4. summarize counts, burden, volume, and density by region
+
+This keeps the biological measurements tied to the subject's own tissue geometry.
+
+### Reference-Space Aligned Maps
+
+Reference-space maps are useful for visualization and cross-subject comparison after anatomical
+alignment.
+
+However, an unmodulated aligned map should not automatically be interpreted as native cell density.
+After nonlinear warping, local expansion or compression can change how many points fall into a
+reference-space voxel even when native tissue density was unchanged.
+
+For that reason:
+
+- unmodulated aligned maps are useful descriptive outputs
+- subject-space region summaries remain the canonical quantitative outputs
+- Jacobian-modulated reference-space maps are a later specialized lane that requires explicit
+  validation
+
+## Voxel-Map Axis Order
+
+Internally, voxel maps follow the same explicit spatial axis convention as point clouds and
+metadata:
 
 - voxel arrays are indexed as `data[x, y, z]`
 - `space.shape` is interpreted in the same `x, y, z` order
-- `axis_labels` and `orientation` therefore describe the in-memory voxel map
-  directly
+- `axis_labels` and `orientation` therefore describe the in-memory voxel map directly
 
-This is a deliberate package convention. It favors clear spatial reasoning and
-consistency with the canonical point-cloud columns over image-stack or
-matrix-style indexing conventions.
+This is a deliberate package convention. It favors clear spatial reasoning and consistency with the
+canonical point-cloud columns over image-stack or matrix-style indexing conventions.
 
-Some external image-oriented tools and array libraries commonly treat 3D arrays
-as `z, y, x` because they extend 2D row/column indexing (`y, x`) by adding the
-slice axis first. `spatialsignal` does **not** use that convention
-internally.
+Some external image-oriented tools and array libraries commonly treat 3D arrays as `z, y, x`
+because they extend 2D row/column indexing by adding the slice axis first. `spatialsignal` does
+not use that convention internally.
 
-When voxel maps are later exported to formats or libraries that expect
-image-style axis order, any required permutation should happen explicitly at the
-I/O boundary rather than silently inside the core spatial model.
+When voxel maps are exported to formats or libraries that expect image-style axis order, any
+required permutation should happen explicitly at the I/O boundary rather than silently inside the
+core spatial model.
 
 ## NIfTI Export Orientation
 
-When writing NIfTI outputs, the package converts from the repo's BrainGlobe
-origin-based orientation convention into NIfTI's affine-based RAS world
-convention explicitly.
+When writing NIfTI outputs, the package converts from the repo's BrainGlobe origin-based
+orientation convention into NIfTI's affine-based RAS world convention explicitly.
 
 This means:
 
-- `orientation` in `SpaceDefinition` still means "where voxel index 0 is"
-- the NIfTI affine then encodes the resulting directions of increasing voxel
-  indices in an RAS+ world
+- `orientation` in `SpaceDefinition` still means where voxel index `0` is
+- the NIfTI affine then encodes the resulting directions of increasing voxel indices in an RAS+
+  world
 
-Those are related conventions, but they are not the same thing, so they should
-not be interpreted interchangeably.
+Those are related conventions, but they are not the same thing, so they should not be interpreted
+interchangeably.

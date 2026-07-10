@@ -1,108 +1,92 @@
 # Workflow
 
-## Milestone 1
+This document describes the workflows currently supported by `spatialsignal` and the
+boundaries between `spatialsignal` and the rest of the LSFM ecosystem.
 
-The first implementation milestone focuses on a single task:
+## What spatialsignal does
 
-1. Read Cellpose mask images from a directory.
-2. Assign sequential slice indices from naturally sorted filenames.
-3. Extract one centroid per labeled object.
-4. Export a clean 3D point-cloud CSV.
-5. Export a metadata JSON describing the point-cloud space and representation type.
-6. Write centroid QC images.
-7. Validate the output against the legacy MATLAB centroid CSV.
+`spatialsignal` currently supports four core workflow types:
 
-## In Scope
+1. Build subject-space centroid point clouds from labeled instance-segmentation masks.
+2. Build subject-space dense signal-point tables from binary semantic masks.
+3. Deduplicate repeated cell-body detections across adjacent planes.
+4. Voxelize subject-space point clouds or semantic masks into subject-aligned analysis grids.
 
-- Cellpose mask ingestion from `masks_*.tif*`
-- Centroid extraction from labeled 2D masks
-- Canonical point-cloud CSV export with explicit `x,y,z` coordinates
-- Standard per-object mask-derived properties stored alongside the points
-- Point-cloud space JSON export
-- Centroid QC image output
-- Comparison against the legacy MATLAB centroid CSV
-- Unit tests on small synthetic masks
+These workflows produce explicit spatial representations together with metadata sidecars that
+make the coordinate system, indexing convention, representation type, and processing provenance
+visible. The canonical starter configs use zero-based `x,y,z` indexing for subject-space outputs.
 
-## Out of Scope
+The canonical interface is the reusable Python code in `src/spatialsignal/`. The runnable
+`examples/` in the repo are thin wrappers around those APIs and currently serve mainly as practical
+examples and testing helpers.
 
-- ANTs registration
-- Atlas transforms
-- Common-space registration of point clouds
-- Voxelized density maps
-- Group statistics or hotspot detection
+## Supported workflows
 
-## Updated Roadmap
+### Instance-segmentation workflow
 
-After milestone 1, the planned next milestones are:
+Use this workflow when each labeled object in a 2D mask corresponds to one cell body or other
+instance-like detection.
 
-1. Point-cloud space and metadata utilities
-2. General voxelization utilities operating within the current point-cloud space
-3. Coordinate transforms and support for mapping point clouds into age-specific reference spaces and CCFv3
-4. Analysis-ready outputs such as group-level density maps and hotspot-oriented summaries
+Typical steps:
 
-## Deduplicate Across Planes
+1. Build a raw detection point cloud with `examples/build_pointcloud.py`.
+2. Optionally validate the result against the legacy MATLAB centroid CSV.
+3. Deduplicate repeated detections across nearby z planes with `examples/deduplicate_across_planes.py`.
+4. Optionally voxelize the cleaned object table into a subject-aligned count map with `examples/voxelize_pointcloud.py`.
 
-The next processing stage after raw point-cloud build is cross-plane
-deduplication of likely repeated cell-body detections.
+Primary outputs:
 
-### Purpose
+- raw detection point cloud CSV + metadata JSON
+- cleaned object table CSV + metadata JSON
+- optional subject-aligned count map outputs
 
-- input: raw detection point cloud
-- output: cleaned object point cloud
-- goal: merge detections that likely represent the same biological cell across
-  nearby planes only
+### Semantic-mask workflow
 
-This stage is intentionally separate from centroid extraction. It does not try
-to split touching cells within one plane; for Cellpose-based workflows that is
-treated as an upstream instance-segmentation problem.
+Use this workflow when the mask represents dense semantic support such as positive signal,
+process masks, or other non-instance binary segmentation outputs.
 
-### Current Method
+Typical steps:
 
-The current implementation:
+1. Build dense signal-support points with `examples/build_signal_points.py` when an explicit
+   point representation is useful.
+2. Or voxelize semantic masks directly into a subject-aligned fraction map with
+   `examples/voxelize_signal_masks.py`.
 
-1. Starts from the raw detection point cloud.
-2. Compares detections only across forward neighboring planes up to
-   `max_plane_offset`.
-3. Uses lateral distance in physical units (`max_xy_distance_um`) to decide
-   whether two detections can be linked.
-4. Builds connected components from accepted links.
-5. Optionally enforces a biological cap with `max_n_planes`.
-6. Aggregates each component into one cleaned object row.
+Primary outputs:
 
-### Current Outputs
+- dense signal-point CSV + metadata JSON
+- subject-aligned fraction map outputs
 
-The deduplication stage writes:
+### Quality-control and validation workflow
 
-- `{subject_name}_objects.csv`
-- `{subject_name}_objects_space.json`
-- `{subject_name}_object_membership.csv`
-  - detection-to-object membership mapping from raw `detection_id` values to
-    cleaned `object_id` values
+The package also provides QC and validation helpers for:
 
-Optional debug output:
+- centroid image generation
+- pairwise duplicate QC for deduplication
+- MATLAB centroid CSV comparison
+- point-cloud dataset validation against the declared metadata sidecar
 
-- `{subject_name}_object_edges.csv`
-  - accepted pairwise cross-plane links used internally to build the cleaned
-    objects
+## Spatial interpretation
 
-The cleaned objects JSON keeps the same spatial frame as the raw point cloud
-and also records a `processing` block containing:
+The current package is subject-space-first.
 
-- `stage`
-- `source_name`
-- `parameters`
-- `summary`
+- Subject-space point tables and subject-space region summaries are intended to be the canonical
+  quantitative outputs.
+- Subject-aligned voxel maps are useful for visualization, QC, and later subject-space
+  quantification.
+- Reference-space maps are expected to be useful mainly for visualization and cross-subject
+  comparison, not as the primary biological truth.
 
-### Optional Pairwise QC
+A fuller discussion of subject-space quantification versus reference-space aligned maps lives in
+`docs/coordinate_systems.md`.
 
-The deduplication script can optionally create mask-based pairwise QC images
-for a few sampled adjacent plane pairs. These QC images:
+## Near-term direction
 
-- color objects green if they were linked across that exact plane pair
-- color objects red if they were not linked across that exact plane pair
-- require the original `masks_*.tif*` files to be provided explicitly
-- validate mask/point-cloud alignment before writing output
+The next major workflow extension is expected to be atlas-aware subject-space quantification:
 
-QC files are written into a `pair_qc/` subfolder. The current visualization is
-most directly interpretable when the deduplicated workflow uses a biological
-cap of at most two contributing planes per cleaned object.
+1. load an `atlasspace` registration output folder
+2. use the warped annotation in subject space
+3. assign objects or voxelized signal to regions
+4. summarize subject-space counts, burden, volume, and density by region
+
+The detailed plan for that work lives in `docs/roadmap.md`.

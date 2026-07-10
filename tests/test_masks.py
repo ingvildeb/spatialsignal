@@ -34,3 +34,19 @@ def test_assign_slices_returns_sequential_indices() -> None:
         (4, Path("masks_2.tif")),
         (5, Path("masks_3.tif")),
     ]
+
+
+def test_assign_slices_supports_zero_start() -> None:
+    mask_files = [Path("masks_1.tif"), Path("masks_2.tif")]
+
+    assigned = assign_slices(mask_files)
+
+    assert assigned == [
+        (0, Path("masks_1.tif")),
+        (1, Path("masks_2.tif")),
+    ]
+
+
+def test_assign_slices_rejects_negative_start() -> None:
+    with pytest.raises(ValueError):
+        assign_slices([Path("masks_1.tif")], slice_start=-1)

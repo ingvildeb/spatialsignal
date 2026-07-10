@@ -8,24 +8,31 @@ import numpy as np
 import pandas as pd
 import tifffile
 
+from spatialsignal.io.masks import assign_slices
+from spatialsignal.pointcloud._indexing import (
+    coordinate_offset,
+    resolve_slice_start,
+    validate_indexing,
+)
+
 
 def pointcloud_slice_to_image(
     slice_points: pd.DataFrame,
     image_shape: tuple[int, int],
     *,
-    one_based: bool = True,
+    indexing: str = "zero_based",
 ) -> np.ndarray:
     """Convert one slice of point-cloud rows into a binary centroid image."""
+
+    indexing = validate_indexing(indexing)
 
     image = np.zeros(image_shape, dtype=np.uint8)
     if slice_points.empty:
         return image
 
-    x_offset = 1 if one_based else 0
-    y_offset = 1 if one_based else 0
-
-    ys = slice_points["y"].to_numpy(dtype=int) - y_offset
-    xs = slice_points["x"].to_numpy(dtype=int) - x_offset
+    offset = coordinate_offset(indexing)
+    ys = slice_points["y"].to_numpy(dtype=int) - offset
+    xs = slice_points["x"].to_numpy(dtype=int) - offset
 
     in_bounds = (
         (ys >= 0)
@@ -42,20 +49,24 @@ def write_centroid_images(
     pointcloud: pd.DataFrame,
     out_dir: Path,
     *,
-    one_based: bool = True,
+    indexing: str = "zero_based",
+    slice_start: int | None = None,
     prefix: str = "centroids_",
 ) -> None:
     """Write one centroid QC image per mask slice."""
 
+    indexing = validate_indexing(indexing)
+    resolved_slice_start = resolve_slice_start(indexing, slice_start)
+
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    for slice_index, mask_path in enumerate(mask_files, start=1):
+    for slice_index, mask_path in assign_slices(mask_files, slice_start=resolved_slice_start):
         mask = tifffile.imread(mask_path)
         slice_points = pointcloud.loc[pointcloud["z"] == slice_index]
         image = pointcloud_slice_to_image(
             slice_points,
             mask.shape,
-            one_based=one_based,
+            indexing=indexing,
         )
         mask_name = mask_path.name
         if mask_name.startswith("masks_"):

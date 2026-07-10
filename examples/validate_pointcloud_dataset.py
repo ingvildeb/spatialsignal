@@ -1,4 +1,4 @@
-"""CLI for loading and validating a point-cloud dataset."""
+"""Example runner for loading and validating a point-cloud dataset."""
 
 from __future__ import annotations
 

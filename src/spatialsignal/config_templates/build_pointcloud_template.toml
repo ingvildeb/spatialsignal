@@ -1,0 +1,30 @@
+# spatialsignal_template_id = build_pointcloud
+# spatialsignal_template_revision = 2026-07-10
+# Copy this template to a local TOML file and edit the paths for your dataset.
+
+[subject]
+name = "Example_Subject"
+
+[input]
+mask_dir = 'C:\path\to\instance_masks'
+pattern = "masks_*.tif*"
+
+[output]
+out_dir = 'C:\path\to\pointcloud_output'
+
+[space]
+name = "subject_space"
+orientation = "las"
+resolution_um = [1.8, 1.8, 20.0]
+indexing = "zero_based"
+
+[data]
+representation_type = "point_centroids"
+
+[processing]
+max_workers = 8
+show_progress = true
+progress_interval = 25
+
+[qc]
+write_centroid_images = true

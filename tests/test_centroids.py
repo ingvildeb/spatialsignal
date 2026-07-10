@@ -27,7 +27,9 @@ def test_matlab_round_matches_expected_half_up_behavior() -> None:
     assert matlab_round(10.49) == 10
 
 
-def test_extract_centroids_from_mask_returns_expected_columns_and_values(tmp_path: Path) -> None:
+def test_extract_centroids_from_mask_returns_expected_zero_based_columns_and_values(
+    tmp_path: Path,
+) -> None:
     mask = np.array(
         [
             [0, 1, 1],
@@ -46,12 +48,12 @@ def test_extract_centroids_from_mask_returns_expected_columns_and_values(tmp_pat
             {
                 "detection_id": 1,
                 "seg_num": 1,
-                "x": 3,
-                "y": 1,
+                "x": 2,
+                "y": 0,
                 "z": 1,
                 "area_px": 2,
-                "x_float": 2.5,
-                "y_float": 1.0,
+                "x_float": 1.5,
+                "y_float": 0.0,
                 "major_axis_length_px": 2.0,
                 "minor_axis_length_px": 0.0,
                 "eccentricity": 1.0,
@@ -59,12 +61,12 @@ def test_extract_centroids_from_mask_returns_expected_columns_and_values(tmp_pat
             {
                 "detection_id": 2,
                 "seg_num": 2,
-                "x": 2,
-                "y": 3,
+                "x": 1,
+                "y": 2,
                 "z": 1,
                 "area_px": 2,
-                "x_float": 1.5,
-                "y_float": 3.0,
+                "x_float": 0.5,
+                "y_float": 2.0,
                 "major_axis_length_px": 2.0,
                 "minor_axis_length_px": 0.0,
                 "eccentricity": 1.0,
@@ -74,6 +76,32 @@ def test_extract_centroids_from_mask_returns_expected_columns_and_values(tmp_pat
     )
 
     pd.testing.assert_frame_equal(pointcloud.reset_index(drop=True), expected)
+
+
+def test_extract_centroids_from_mask_supports_one_based_legacy_export(
+    tmp_path: Path,
+) -> None:
+    mask = np.array(
+        [
+            [0, 1, 1],
+            [0, 0, 0],
+            [2, 2, 0],
+        ],
+        dtype=np.uint16,
+    )
+    mask_path = tmp_path / "masks_1.tif"
+    tifffile.imwrite(mask_path, mask)
+
+    pointcloud = extract_centroids_from_mask(
+        mask_path,
+        slice_index=1,
+        indexing="one_based",
+    )
+
+    assert list(pointcloud["x"]) == [3, 2]
+    assert list(pointcloud["y"]) == [1, 3]
+    assert list(pointcloud["x_float"]) == [2.5, 1.5]
+    assert list(pointcloud["y_float"]) == [1.0, 3.0]
 
 
 def test_extract_centroids_from_mask_returns_empty_table_for_empty_mask(
@@ -89,7 +117,9 @@ def test_extract_centroids_from_mask_returns_empty_table_for_empty_mask(
     assert pointcloud.empty
 
 
-def test_extract_centroids_from_mask_stack_uses_slice_order(tmp_path: Path) -> None:
+def test_extract_centroids_from_mask_stack_uses_zero_based_slice_order(
+    tmp_path: Path,
+) -> None:
     mask1 = np.array(
         [
             [0, 1, 1],
@@ -116,9 +146,9 @@ def test_extract_centroids_from_mask_stack_uses_slice_order(tmp_path: Path) -> N
 
     expected_xyz = pd.DataFrame(
         [
-            {"detection_id": 1, "seg_num": 1, "x": 3, "y": 1, "z": 1},
-            {"detection_id": 2, "seg_num": 2, "x": 2, "y": 3, "z": 1},
-            {"detection_id": 3, "seg_num": 3, "x": 3, "y": 2, "z": 2},
+            {"detection_id": 1, "seg_num": 1, "x": 2, "y": 0, "z": 0},
+            {"detection_id": 2, "seg_num": 2, "x": 1, "y": 2, "z": 0},
+            {"detection_id": 3, "seg_num": 3, "x": 2, "y": 1, "z": 1},
         ]
     )
 
@@ -128,7 +158,29 @@ def test_extract_centroids_from_mask_stack_uses_slice_order(tmp_path: Path) -> N
     )
 
 
-def test_pointcloud_slice_to_image_marks_expected_pixels() -> None:
+def test_pointcloud_slice_to_image_marks_expected_pixels_for_zero_based_coordinates() -> None:
+    slice_points = pd.DataFrame(
+        [
+            {"detection_id": 1, "seg_num": 1, "x": 2, "y": 0, "z": 0},
+            {"detection_id": 2, "seg_num": 2, "x": 1, "y": 2, "z": 0},
+        ]
+    )
+
+    image = pointcloud_slice_to_image(slice_points, (3, 3))
+
+    expected = np.array(
+        [
+            [0, 0, 255],
+            [0, 0, 0],
+            [0, 255, 0],
+        ],
+        dtype=np.uint8,
+    )
+
+    np.testing.assert_array_equal(image, expected)
+
+
+def test_pointcloud_slice_to_image_supports_one_based_coordinates() -> None:
     slice_points = pd.DataFrame(
         [
             {"detection_id": 1, "seg_num": 1, "x": 3, "y": 1, "z": 1},
@@ -136,7 +188,7 @@ def test_pointcloud_slice_to_image_marks_expected_pixels() -> None:
         ]
     )
 
-    image = pointcloud_slice_to_image(slice_points, (3, 3), one_based=True)
+    image = pointcloud_slice_to_image(slice_points, (3, 3), indexing="one_based")
 
     expected = np.array(
         [
@@ -179,10 +231,12 @@ def test_build_pointcloud_from_masks_writes_csv_and_space_json(tmp_path: Path) -
     assert (out_dir / "Test_Subject_pointcloud_space.json").exists()
     pointcloud = pd.read_csv(out_dir / "Test_Subject_pointcloud.csv")
     assert list(pointcloud["detection_id"]) == [1, 2]
+    assert list(pointcloud["z"]) == [0, 0]
     with (out_dir / "Test_Subject_pointcloud_space.json").open("r", encoding="utf-8") as handle:
         metadata = json.load(handle)
     assert metadata["representation"]["kind"] == "point_cloud"
     assert metadata["representation"]["representation_type"] == "point_centroids"
+    assert metadata["space"]["indexing"] == "zero_based"
 
 
 def test_dataset_metadata_round_trip_json(tmp_path: Path) -> None:
@@ -193,7 +247,7 @@ def test_dataset_metadata_round_trip_json(tmp_path: Path) -> None:
             space_name="subject_space",
             orientation="las",
             axis_labels=["x", "y", "z"],
-            indexing="one_based",
+            indexing="zero_based",
             units="voxel",
             shape=[10, 20, 30],
             resolution_um=[1.8, 1.8, 5.0],

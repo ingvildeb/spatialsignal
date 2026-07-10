@@ -1,4 +1,4 @@
-"""CLI for voxelizing centroid point clouds into a subject analysis space."""
+"""Example runner for voxelizing centroid point clouds into a subject analysis space."""
 
 from __future__ import annotations
 
@@ -6,9 +6,9 @@ import argparse
 import json
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
+from spatialsignal.io import save_voxel_map_outputs
 from spatialsignal.models import (
     DataRepresentation,
     DatasetMetadata,
@@ -16,9 +16,7 @@ from spatialsignal.models import (
     ProcessingProvenance,
     SpaceDefinition,
 )
-from spatialsignal.pointcloud.build import make_subject_output_stem
 from spatialsignal.voxelization import (
-    build_nifti_ras_affine,
     make_subject_analysis_space,
     voxelize_to_space,
 )
@@ -89,15 +87,7 @@ def main() -> int:
     voxel_map = voxelize_to_space(dataset, analysis_space)
 
     out_dir = Path(args.out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    output_stem = make_subject_output_stem(dataset.subject_name)
-    map_path = out_dir / f"{output_stem}_count_map.npy"
-    nifti_path = out_dir / f"{output_stem}_count_map.nii.gz"
-    metadata_path = out_dir / f"{output_stem}_count_map_space.json"
-
-    np.save(map_path, voxel_map.data)
-    nifti_written = write_nifti_count_map(voxel_map.data, voxel_map.space, nifti_path)
-    voxel_map.metadata.to_json(metadata_path)
+    output_paths = save_voxel_map_outputs(voxel_map, out_dir, name_suffix="count_map")
 
     summary = voxel_map.summary()
     print("Point-cloud voxelization complete")
@@ -108,12 +98,12 @@ def main() -> int:
     print(f"  target_resolution_um: {tuple(voxel_map.space.resolution_um)}")
     print(f"  total_count: {int(voxel_map.data.sum())}")
     print(f"  nonzero_voxels: {summary['nonzero_voxels']}")
-    print(f"  count_map_npy: {map_path}")
-    if nifti_written:
-        print(f"  count_map_nifti: {nifti_path}")
+    print(f"  count_map_npy: {output_paths.array_path}")
+    if output_paths.nifti_written:
+        print(f"  count_map_nifti: {output_paths.nifti_path}")
     else:
         print("  count_map_nifti: skipped (install nibabel to enable NIfTI export)")
-    print(f"  count_map_space_json: {metadata_path}")
+    print(f"  count_map_space_json: {output_paths.metadata_path}")
 
     return 0
 
@@ -194,26 +184,5 @@ def infer_subject_name_from_pointcloud_path(csv_path: Path) -> str:
         if stem.endswith(suffix):
             return stem[: -len(suffix)]
     return stem
-
-
-def write_nifti_count_map(
-    data_xyz: np.ndarray,
-    space: SpaceDefinition,
-    output_path: Path,
-) -> bool:
-    """Write a voxel map as NIfTI if nibabel is available."""
-
-    try:
-        import nibabel as nib
-    except ModuleNotFoundError:
-        return False
-
-    affine = build_nifti_ras_affine(space)
-    image = nib.Nifti1Image(data_xyz, affine)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    nib.save(image, str(output_path))
-    return True
-
-
 if __name__ == "__main__":
     raise SystemExit(main())

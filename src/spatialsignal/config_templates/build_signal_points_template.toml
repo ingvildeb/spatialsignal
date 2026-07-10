@@ -1,0 +1,24 @@
+# spatialsignal_template_id = build_signal_points
+# spatialsignal_template_revision = 2026-07-10
+# Copy this template to a local TOML file and edit the paths for your dataset.
+
+[subject]
+name = "Example_Subject"
+
+[input]
+mask_dir = 'C:\path\to\semantic_masks'
+pattern = "*.tif*"
+
+[output]
+out_dir = 'C:\path\to\signal_point_output'
+
+[space]
+name = "subject_space"
+orientation = "las"
+resolution_um = [1.8, 1.8, 20.0]
+indexing = "zero_based"
+
+[processing]
+max_workers = 8
+show_progress = true
+progress_interval = 25

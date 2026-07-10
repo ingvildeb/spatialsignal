@@ -1,18 +1,15 @@
-"""CLI for cross-plane deduplication of raw point-cloud detections."""
+"""Example runner for cross-plane deduplication of raw point-cloud detections."""
 
 from __future__ import annotations
 
 import argparse
-from dataclasses import replace
 from pathlib import Path
 
+from spatialsignal.io import save_deduplication_outputs
 from spatialsignal.pointcloud import (
     PointCloudDataset,
-    ProcessingProvenance,
     deduplicate_across_planes,
-    summarize_deduplication_result,
 )
-from spatialsignal.pointcloud.build import make_subject_output_stem
 from spatialsignal.qc import select_qc_plane_pairs, write_pair_duplicate_qc
 
 
@@ -122,32 +119,19 @@ def main() -> int:
         max_n_planes=args.max_n_planes,
     )
 
-    output_stem = make_subject_output_stem(dataset.subject_name)
     out_dir = Path(args.out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
-
-    objects_csv = out_dir / f"{output_stem}_objects.csv"
-    objects_json = out_dir / f"{output_stem}_objects_space.json"
-    edges_csv = out_dir / f"{output_stem}_object_edges.csv"
-    membership_csv = out_dir / f"{output_stem}_object_membership.csv"
-
-    processing_metadata = ProcessingProvenance(
-        stage="deduplicate_across_planes",
+    output_paths = save_deduplication_outputs(
+        dataset,
+        result,
+        out_dir,
         source_name=Path(args.pointcloud_csv).name,
         parameters={
             "max_plane_offset": args.max_plane_offset,
             "max_xy_distance_um": args.max_xy_distance_um,
             "max_n_planes": args.max_n_planes,
         },
-        summary=summarize_deduplication_result(dataset.points, result),
+        write_edge_table=args.write_edge_table,
     )
-    objects_metadata = replace(dataset.metadata, processing=processing_metadata)
-
-    result.objects.to_csv(objects_csv, index=False)
-    objects_metadata.to_json(objects_json)
-    result.membership.to_csv(membership_csv, index=False)
-    if args.write_edge_table:
-        result.edges.to_csv(edges_csv, index=False)
 
     qc_summary_path = None
     if args.write_pair_qc:
@@ -170,11 +154,11 @@ def main() -> int:
     print(f"  cleaned_objects: {len(result.objects)}")
     print(f"  accepted_edges: {len(result.edges)}")
     print(f"  max_n_planes: {args.max_n_planes}")
-    print(f"  objects_csv: {objects_csv}")
-    print(f"  objects_space_json: {objects_json}")
-    if args.write_edge_table:
-        print(f"  edges_csv: {edges_csv}")
-    print(f"  object_membership_csv: {membership_csv}")
+    print(f"  objects_csv: {output_paths.objects_csv}")
+    print(f"  objects_space_json: {output_paths.objects_json}")
+    if output_paths.edges_csv is not None:
+        print(f"  edges_csv: {output_paths.edges_csv}")
+    print(f"  object_membership_csv: {output_paths.membership_csv}")
     if qc_summary_path is not None:
         print(f"  pair_qc_summary_json: {qc_summary_path}")
 

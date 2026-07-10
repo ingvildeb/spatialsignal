@@ -1,4 +1,4 @@
-"""CLI for comparing canonical Python and legacy MATLAB centroid CSV outputs."""
+"""Example runner for comparing canonical Python and legacy MATLAB centroid CSV outputs."""
 
 from __future__ import annotations
 

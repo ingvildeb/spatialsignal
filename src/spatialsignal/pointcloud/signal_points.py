@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures import as_completed
+from concurrent.futures.process import BrokenProcessPool
 from pathlib import Path
 
 import numpy as np
@@ -11,6 +12,11 @@ import pandas as pd
 import tifffile
 
 from spatialsignal.io.masks import assign_slices
+from spatialsignal.pointcloud._indexing import (
+    coordinate_offset,
+    resolve_slice_start,
+    validate_indexing,
+)
 
 
 SIGNAL_POINT_REQUIRED_COLUMNS = ["point_id", "x", "y", "z"]
@@ -20,16 +26,18 @@ def extract_signal_points_from_mask(
     mask_path: Path,
     slice_index: int,
     *,
-    one_based: bool = True,
+    indexing: str = "zero_based",
 ) -> pd.DataFrame:
     """Extract one signal-support point per nonzero pixel from a 2D mask image."""
+
+    indexing = validate_indexing(indexing)
 
     mask = tifffile.imread(mask_path)
     rows, cols = np.nonzero(mask)
     if rows.size == 0:
         return pd.DataFrame(columns=SIGNAL_POINT_REQUIRED_COLUMNS)
 
-    offset = 1 if one_based else 0
+    offset = coordinate_offset(indexing)
     points = pd.DataFrame(
         {
             "point_id": np.arange(1, rows.size + 1, dtype=int),
@@ -42,27 +50,29 @@ def extract_signal_points_from_mask(
     return points
 
 
-def _extract_signal_points_task(task: tuple[Path, int, bool]) -> tuple[int, pd.DataFrame]:
+def _extract_signal_points_task(task: tuple[Path, int, str]) -> tuple[int, pd.DataFrame]:
     """Helper for parallel signal-point extraction."""
 
-    mask_path, slice_index, one_based = task
-    points = extract_signal_points_from_mask(mask_path, slice_index, one_based=one_based)
+    mask_path, slice_index, indexing = task
+    points = extract_signal_points_from_mask(mask_path, slice_index, indexing=indexing)
     return slice_index, points
 
 
 def extract_signal_points_from_mask_stack(
     mask_files: list[Path],
     *,
-    slice_start: int = 1,
-    one_based: bool = True,
+    indexing: str = "zero_based",
+    slice_start: int | None = None,
     max_workers: int | None = 1,
     show_progress: bool = False,
     progress_interval: int = 25,
 ) -> pd.DataFrame:
     """Extract signal-support points from a naturally ordered mask stack."""
 
-    assigned_masks = assign_slices(mask_files, slice_start=slice_start)
-    tasks = [(mask_path, slice_index, one_based) for slice_index, mask_path in assigned_masks]
+    indexing = validate_indexing(indexing)
+    resolved_slice_start = resolve_slice_start(indexing, slice_start)
+    assigned_masks = assign_slices(mask_files, slice_start=resolved_slice_start)
+    tasks = [(mask_path, slice_index, indexing) for slice_index, mask_path in assigned_masks]
 
     if max_workers in (None, 0):
         max_workers = 1
@@ -86,18 +96,23 @@ def extract_signal_points_from_mask_stack(
             point_tables_by_slice[slice_index] = points
             maybe_print_progress(completed)
     else:
-        with ProcessPoolExecutor(max_workers=max_workers) as executor:
-            futures = [executor.submit(_extract_signal_points_task, task) for task in tasks]
-            point_tables_by_slice = {}
-            for completed, future in enumerate(as_completed(futures), start=1):
-                slice_index, points = future.result()
-                point_tables_by_slice[slice_index] = points
-                maybe_print_progress(completed)
+        try:
+            with ProcessPoolExecutor(max_workers=max_workers) as executor:
+                futures = [executor.submit(_extract_signal_points_task, task) for task in tasks]
+                point_tables_by_slice = {}
+                for completed, future in enumerate(as_completed(futures), start=1):
+                    slice_index, points = future.result()
+                    point_tables_by_slice[slice_index] = points
+                    maybe_print_progress(completed)
+        except BrokenProcessPool as exc:
+            raise RuntimeError(
+                "Parallel signal-point extraction failed because a worker process exited unexpectedly. "
+                "On Windows this commonly happens when running from an interactive cell or from a "
+                "script without an `if __name__ == '__main__':` guard. Retry with `max_workers=1`, "
+                "or run the workflow from a guarded script."
+            ) from exc
 
-    point_tables = [
-        point_tables_by_slice[slice_index]
-        for slice_index, _ in assigned_masks
-    ]
+    point_tables = [point_tables_by_slice[slice_index] for slice_index, _ in assigned_masks]
     if not point_tables:
         return pd.DataFrame(columns=SIGNAL_POINT_REQUIRED_COLUMNS)
 

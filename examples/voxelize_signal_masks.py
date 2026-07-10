@@ -1,18 +1,15 @@
-"""CLI for voxelizing binary semantic mask stacks into a subject analysis fraction map."""
+"""Example runner for voxelizing binary semantic mask stacks into a subject analysis fraction map."""
 
 from __future__ import annotations
 
 import argparse
 from pathlib import Path
 
-import numpy as np
-
+from spatialsignal.io import save_voxel_map_outputs
 from spatialsignal.io.masks import find_mask_files
 from spatialsignal.models import SpaceDefinition
-from spatialsignal.pointcloud.build import make_subject_output_stem
 from spatialsignal.utils import load_toml_config, require_config_value
 from spatialsignal.voxelization import (
-    build_nifti_ras_affine,
     make_subject_analysis_space,
     voxelize_signal_masks_to_fraction_map,
 )
@@ -51,7 +48,7 @@ def main() -> int:
     source_space_name = require_config_value(config, "space", "name")
     orientation = require_config_value(config, "space", "orientation")
     resolution_um = require_config_value(config, "space", "resolution_um")
-    indexing = config.get("space", {}).get("indexing", "one_based")
+    indexing = config.get("space", {}).get("indexing", "zero_based")
 
     analysis_resolution_um = require_config_value(
         config,
@@ -88,15 +85,7 @@ def main() -> int:
         progress_interval=progress_interval,
     )
 
-    out_dir.mkdir(parents=True, exist_ok=True)
-    output_stem = make_subject_output_stem(subject_name)
-    map_path = out_dir / f"{output_stem}_fraction_map.npy"
-    nifti_path = out_dir / f"{output_stem}_fraction_map.nii.gz"
-    metadata_path = out_dir / f"{output_stem}_fraction_map_space.json"
-
-    np.save(map_path, voxel_map.data)
-    nifti_written = write_nifti_voxel_map(voxel_map.data, voxel_map.space, nifti_path)
-    voxel_map.metadata.to_json(metadata_path)
+    output_paths = save_voxel_map_outputs(voxel_map, out_dir, name_suffix="fraction_map")
 
     summary = voxel_map.summary()
     processing_summary = voxel_map.metadata.processing.summary if voxel_map.metadata.processing else {}
@@ -111,33 +100,14 @@ def main() -> int:
     print(f"  input_signal_points: {processing_summary.get('input_signal_points', 0)}")
     print(f"  nonzero_voxels: {summary['nonzero_voxels']}")
     print(f"  max_fraction: {summary['max']}")
-    print(f"  fraction_map_npy: {map_path}")
-    if nifti_written:
-        print(f"  fraction_map_nifti: {nifti_path}")
+    print(f"  fraction_map_npy: {output_paths.array_path}")
+    if output_paths.nifti_written:
+        print(f"  fraction_map_nifti: {output_paths.nifti_path}")
     else:
         print("  fraction_map_nifti: skipped (install nibabel to enable NIfTI export)")
-    print(f"  fraction_map_space_json: {metadata_path}")
+    print(f"  fraction_map_space_json: {output_paths.metadata_path}")
 
     return 0
-
-
-def write_nifti_voxel_map(
-    data_xyz: np.ndarray,
-    space: SpaceDefinition,
-    output_path: Path,
-) -> bool:
-    """Write a voxel map as NIfTI if nibabel is available."""
-
-    try:
-        import nibabel as nib
-    except ModuleNotFoundError:
-        return False
-
-    affine = build_nifti_ras_affine(space)
-    image = nib.Nifti1Image(data_xyz, affine)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    nib.save(image, str(output_path))
-    return True
 
 
 if __name__ == "__main__":

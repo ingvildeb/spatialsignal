@@ -13,7 +13,7 @@ from spatialsignal.pointcloud import (
 )
 
 
-def test_extract_signal_points_from_mask_returns_expected_rows(tmp_path: Path) -> None:
+def test_extract_signal_points_from_mask_returns_expected_zero_based_rows(tmp_path: Path) -> None:
     mask = np.array(
         [
             [0, 1, 0],
@@ -26,6 +26,37 @@ def test_extract_signal_points_from_mask_returns_expected_rows(tmp_path: Path) -
     tifffile.imwrite(mask_path, mask)
 
     points = extract_signal_points_from_mask(mask_path, slice_index=2)
+
+    expected = pd.DataFrame(
+        [
+            {"point_id": 1, "x": 1, "y": 0, "z": 2},
+            {"point_id": 2, "x": 0, "y": 1, "z": 2},
+            {"point_id": 3, "x": 2, "y": 1, "z": 2},
+        ],
+        columns=SIGNAL_POINT_REQUIRED_COLUMNS,
+    )
+    pd.testing.assert_frame_equal(points.reset_index(drop=True), expected)
+
+
+def test_extract_signal_points_from_mask_supports_one_based_legacy_export(
+    tmp_path: Path,
+) -> None:
+    mask = np.array(
+        [
+            [0, 1, 0],
+            [1, 0, 1],
+            [0, 0, 0],
+        ],
+        dtype=np.uint8,
+    )
+    mask_path = tmp_path / "signal_1.tif"
+    tifffile.imwrite(mask_path, mask)
+
+    points = extract_signal_points_from_mask(
+        mask_path,
+        slice_index=2,
+        indexing="one_based",
+    )
 
     expected = pd.DataFrame(
         [
@@ -51,7 +82,9 @@ def test_extract_signal_points_from_mask_returns_empty_table_for_empty_mask(
     assert points.empty
 
 
-def test_extract_signal_points_from_mask_stack_uses_slice_order(tmp_path: Path) -> None:
+def test_extract_signal_points_from_mask_stack_uses_zero_based_slice_order(
+    tmp_path: Path,
+) -> None:
     mask1 = np.array(
         [
             [0, 1, 0],
@@ -78,10 +111,10 @@ def test_extract_signal_points_from_mask_stack_uses_slice_order(tmp_path: Path) 
 
     expected = pd.DataFrame(
         [
-            {"point_id": 1, "x": 2, "y": 1, "z": 1},
-            {"point_id": 2, "x": 1, "y": 3, "z": 1},
-            {"point_id": 3, "x": 3, "y": 1, "z": 2},
-            {"point_id": 4, "x": 2, "y": 3, "z": 2},
+            {"point_id": 1, "x": 1, "y": 0, "z": 0},
+            {"point_id": 2, "x": 0, "y": 2, "z": 0},
+            {"point_id": 3, "x": 2, "y": 0, "z": 1},
+            {"point_id": 4, "x": 1, "y": 2, "z": 1},
         ],
         columns=SIGNAL_POINT_REQUIRED_COLUMNS,
     )
@@ -117,9 +150,11 @@ def test_build_signal_points_from_masks_writes_csv_and_space_json(tmp_path: Path
     assert (out_dir / "Test_Subject_signal_points_space.json").exists()
     points = pd.read_csv(out_dir / "Test_Subject_signal_points.csv")
     assert list(points["point_id"]) == [1, 2, 3]
+    assert list(points["z"]) == [0, 0, 0]
     with (out_dir / "Test_Subject_signal_points_space.json").open(
         "r", encoding="utf-8"
     ) as handle:
         metadata = json.load(handle)
     assert metadata["representation"]["kind"] == "point_cloud"
     assert metadata["representation"]["representation_type"] == "signal_points"
+    assert metadata["space"]["indexing"] == "zero_based"

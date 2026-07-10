@@ -1,18 +1,22 @@
+# spatialsignal_template_id = voxelize_signal_masks
+# spatialsignal_template_revision = 2026-07-10
+# Copy this template to a local TOML file and edit the paths for your dataset.
+
 [subject]
 name = "Example_Subject"
 
 [input]
-mask_dir = 'Z:\Labmembers\Ingvild\RM1\microglia_ramification_model\analysis_test\100361\ramification_minus_soma'
+mask_dir = 'C:\path\to\semantic_masks'
 pattern = "*.tif*"
 
 [output]
-out_dir = 'C:\Users\SmartBrain_32C_TR\Documents\GitHub\standard_test_data\spatialsignal\voxelize_signal_masks\100361'
+out_dir = 'C:\path\to\fraction_map_output'
 
 [space]
 name = "subject_space"
 orientation = "las"
 resolution_um = [1.8, 1.8, 20.0]
-indexing = "one_based"
+indexing = "zero_based"
 
 [analysis]
 space_name = "subject_analysis_space"
@@ -21,4 +25,3 @@ resolution_um = [20.0, 20.0, 20.0]
 [processing]
 show_progress = true
 progress_interval = 25
-
