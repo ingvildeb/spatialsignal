@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from lsfm_cell_mapping.io import assign_slices, find_mask_files
+from spatialsignal.io import assign_slices, find_mask_files
 
 
 def test_find_mask_files_uses_natural_sort(tmp_path: Path) -> None:

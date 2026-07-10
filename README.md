@@ -1,4 +1,4 @@
-# lsfm_cell_mapping
+# spatialsignal
 
 A spatial point-cloud and mapping toolkit for whole-brain segmented cells.
 
@@ -51,7 +51,7 @@ pip install -e .
 
 ## Build Point Cloud
 
-Edit [`configs/build_pointcloud/default.toml`](/c:/Users/SmartBrain_32C_TR/Documents/GitHub/lsfm_cell_mapping/configs/build_pointcloud/default.toml) to point to your mask directory and output location, then run:
+Edit [`configs/build_pointcloud/default.toml`](/c:/Users/SmartBrain_32C_TR/Documents/GitHub/spatialsignal/configs/build_pointcloud/default.toml) to point to your mask directory and output location, then run:
 
 ```text
 python scripts/build_pointcloud.py --config configs/build_pointcloud/default.toml

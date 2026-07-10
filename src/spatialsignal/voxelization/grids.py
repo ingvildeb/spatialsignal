@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from lsfm_cell_mapping.models import PointCloudDataset, SpaceDefinition
+from spatialsignal.models import PointCloudDataset, SpaceDefinition
 
 
 def empty_grid(

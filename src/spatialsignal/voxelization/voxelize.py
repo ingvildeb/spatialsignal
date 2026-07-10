@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 import tifffile
 
-from lsfm_cell_mapping.models import (
+from spatialsignal.models import (
     DataRepresentation,
     DatasetMetadata,
     PointCloudDataset,
@@ -41,7 +41,7 @@ def voxelize_point_centroids_to_count_map(
     grid = accumulate_count_map(kept_xyz, target_space)
 
     metadata = DatasetMetadata(
-        schema_name="lsfm_cell_mapping.dataset_metadata",
+        schema_name="spatialsignal.dataset_metadata",
         schema_version="0.1.0",
         space=target_space,
         representation=DataRepresentation(
@@ -144,7 +144,7 @@ def _accumulate_signal_masks_to_fraction_map(
     fraction_grid = build_fraction_map_from_counts(numerator_grid, denominator_grid)
 
     metadata = DatasetMetadata(
-        schema_name="lsfm_cell_mapping.dataset_metadata",
+        schema_name="spatialsignal.dataset_metadata",
         schema_version="0.1.0",
         space=target_space,
         representation=DataRepresentation(

@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import tifffile
 
-from lsfm_cell_mapping.pointcloud import (
+from spatialsignal.pointcloud import (
     SIGNAL_POINT_REQUIRED_COLUMNS,
     build_signal_points_from_masks,
     extract_signal_points_from_mask,

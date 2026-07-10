@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from lsfm_cell_mapping.pointcloud.centroids import POINTCLOUD_REQUIRED_COLUMNS
+from spatialsignal.pointcloud.centroids import POINTCLOUD_REQUIRED_COLUMNS
 
 
 LEGACY_MATLAB_COLUMNS = ["seg_num", "x", "y", "z"]

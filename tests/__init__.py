@@ -1,1 +1,1 @@
-"""Test suite for lsfm_cell_mapping."""
+"""Test suite for spatialsignal."""

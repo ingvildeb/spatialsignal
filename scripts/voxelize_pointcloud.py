@@ -9,15 +9,15 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from lsfm_cell_mapping.models import (
+from spatialsignal.models import (
     DataRepresentation,
     DatasetMetadata,
     PointCloudDataset,
     ProcessingProvenance,
     SpaceDefinition,
 )
-from lsfm_cell_mapping.pointcloud.build import make_subject_output_stem
-from lsfm_cell_mapping.voxelization import (
+from spatialsignal.pointcloud.build import make_subject_output_stem
+from spatialsignal.voxelization import (
     build_nifti_ras_affine,
     make_subject_analysis_space,
     voxelize_to_space,
@@ -166,7 +166,7 @@ def load_legacy_flat_metadata(json_path: Path) -> DatasetMetadata:
         )
 
     return DatasetMetadata(
-        schema_name="lsfm_cell_mapping.dataset_metadata",
+        schema_name="spatialsignal.dataset_metadata",
         schema_version=data.get("schema_version", "0.1.0"),
         space=SpaceDefinition(
             space_name=data["space_name"],

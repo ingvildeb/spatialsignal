@@ -14,7 +14,7 @@ from .signal_points import (
     extract_signal_points_from_mask,
     extract_signal_points_from_mask_stack,
 )
-from lsfm_cell_mapping.models.datasets import PointCloudDataset
+from spatialsignal.models.datasets import PointCloudDataset
 from .deduplicate import (
     CLEANED_OBJECT_REQUIRED_COLUMNS,
     EDGE_COLUMNS,
@@ -25,7 +25,7 @@ from .deduplicate import (
     deduplicate_across_planes,
     summarize_deduplication_result,
 )
-from lsfm_cell_mapping.models.metadata import (
+from spatialsignal.models.metadata import (
     DataRepresentation,
     DatasetMetadata,
     ProcessingProvenance,

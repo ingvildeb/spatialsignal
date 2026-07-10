@@ -6,7 +6,7 @@ mask_dir = 'Z:\LSFM\2025\2025_03\2025_03_27\20250327_10_26_10_IEB_IEB0012_M_P14_
 pattern = "masks_*.tif*"
 
 [output]
-out_dir = 'C:\Users\SmartBrain_32C_TR\Documents\GitHub\standard_test_data\lsfm_cell_mapping\build_pointcloud\python'
+out_dir = 'C:\Users\SmartBrain_32C_TR\Documents\GitHub\standard_test_data\spatialsignal\build_pointcloud\python'
 
 [space]
 name = "subject_space"

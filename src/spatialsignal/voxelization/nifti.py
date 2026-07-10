@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from lsfm_cell_mapping.models import SpaceDefinition
+from spatialsignal.models import SpaceDefinition
 
 
 def build_nifti_ras_affine(space: SpaceDefinition) -> np.ndarray:

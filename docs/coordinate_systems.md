@@ -160,7 +160,7 @@ matrix-style indexing conventions.
 
 Some external image-oriented tools and array libraries commonly treat 3D arrays
 as `z, y, x` because they extend 2D row/column indexing (`y, x`) by adding the
-slice axis first. `lsfm_cell_mapping` does **not** use that convention
+slice axis first. `spatialsignal` does **not** use that convention
 internally.
 
 When voxel maps are later exported to formats or libraries that expect

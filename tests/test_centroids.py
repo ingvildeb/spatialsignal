@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import tifffile
 
-from lsfm_cell_mapping.pointcloud import (
+from spatialsignal.pointcloud import (
     DataRepresentation,
     DatasetMetadata,
     POINTCLOUD_COLUMNS,
@@ -18,7 +18,7 @@ from lsfm_cell_mapping.pointcloud import (
     extract_centroids_from_mask_stack,
     matlab_round,
 )
-from lsfm_cell_mapping.qc import pointcloud_slice_to_image
+from spatialsignal.qc import pointcloud_slice_to_image
 
 
 def test_matlab_round_matches_expected_half_up_behavior() -> None:
@@ -187,7 +187,7 @@ def test_build_pointcloud_from_masks_writes_csv_and_space_json(tmp_path: Path) -
 
 def test_dataset_metadata_round_trip_json(tmp_path: Path) -> None:
     metadata = DatasetMetadata(
-        schema_name="lsfm_cell_mapping.dataset_metadata",
+        schema_name="spatialsignal.dataset_metadata",
         schema_version="0.1.0",
         space=SpaceDefinition(
             space_name="subject_space",
@@ -229,7 +229,7 @@ def test_pointcloud_dataset_from_files_and_summary(tmp_path: Path) -> None:
     ).to_csv(csv_path, index=False)
 
     DatasetMetadata(
-        schema_name="lsfm_cell_mapping.dataset_metadata",
+        schema_name="spatialsignal.dataset_metadata",
         schema_version="0.1.0",
         space=SpaceDefinition(
             space_name="subject_space",
@@ -270,7 +270,7 @@ def test_pointcloud_dataset_validate_raises_for_out_of_bounds_points(tmp_path: P
     ).to_csv(csv_path, index=False)
 
     DatasetMetadata(
-        schema_name="lsfm_cell_mapping.dataset_metadata",
+        schema_name="spatialsignal.dataset_metadata",
         schema_version="0.1.0",
         space=SpaceDefinition(
             space_name="subject_space",
@@ -310,7 +310,7 @@ def _make_valid_dataset_files(tmp_path: Path) -> tuple[Path, Path]:
     ).to_csv(csv_path, index=False)
 
     DatasetMetadata(
-        schema_name="lsfm_cell_mapping.dataset_metadata",
+        schema_name="spatialsignal.dataset_metadata",
         schema_version="0.1.0",
         space=SpaceDefinition(
             space_name="subject_space",
@@ -353,7 +353,7 @@ def test_dataset_axis_metadata_invalid(tmp_path: Path) -> None:
     csv_path, json_path = _make_valid_dataset_files(tmp_path)
 
     DatasetMetadata(
-        schema_name="lsfm_cell_mapping.dataset_metadata",
+        schema_name="spatialsignal.dataset_metadata",
         schema_version="0.1.0",
         space=SpaceDefinition(
             space_name="subject_space",
@@ -384,7 +384,7 @@ def test_dataset_indexing_invalid(tmp_path: Path) -> None:
     csv_path, json_path = _make_valid_dataset_files(tmp_path)
 
     DatasetMetadata(
-        schema_name="lsfm_cell_mapping.dataset_metadata",
+        schema_name="spatialsignal.dataset_metadata",
         schema_version="0.1.0",
         space=SpaceDefinition(
             space_name="subject_space",

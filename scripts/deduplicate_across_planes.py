@@ -6,14 +6,14 @@ import argparse
 from dataclasses import replace
 from pathlib import Path
 
-from lsfm_cell_mapping.pointcloud import (
+from spatialsignal.pointcloud import (
     PointCloudDataset,
     ProcessingProvenance,
     deduplicate_across_planes,
     summarize_deduplication_result,
 )
-from lsfm_cell_mapping.pointcloud.build import make_subject_output_stem
-from lsfm_cell_mapping.qc import select_qc_plane_pairs, write_pair_duplicate_qc
+from spatialsignal.pointcloud.build import make_subject_output_stem
+from spatialsignal.qc import select_qc_plane_pairs, write_pair_duplicate_qc
 
 
 def parse_args() -> argparse.Namespace:

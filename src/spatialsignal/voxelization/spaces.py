@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from lsfm_cell_mapping.models import SpaceDefinition
+from spatialsignal.models import SpaceDefinition
 
 
 def make_subject_analysis_space(

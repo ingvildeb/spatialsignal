@@ -5,8 +5,8 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from lsfm_cell_mapping.pointcloud import build_signal_points_from_masks
-from lsfm_cell_mapping.utils import load_toml_config, require_config_value
+from spatialsignal.pointcloud import build_signal_points_from_masks
+from spatialsignal.utils import load_toml_config, require_config_value
 
 
 def parse_args() -> argparse.Namespace:

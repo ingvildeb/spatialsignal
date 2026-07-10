@@ -11,7 +11,7 @@ import pandas as pd
 import tifffile
 from skimage.measure import regionprops_table
 
-from lsfm_cell_mapping.io.masks import assign_slices
+from spatialsignal.io.masks import assign_slices
 
 
 POINTCLOUD_REQUIRED_COLUMNS = ["detection_id", "seg_num", "x", "y", "z"]

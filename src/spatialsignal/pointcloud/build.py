@@ -7,11 +7,11 @@ import re
 
 import pandas as pd
 
-from lsfm_cell_mapping.io.masks import find_mask_files
-from lsfm_cell_mapping.pointcloud.centroids import extract_centroids_from_mask_stack
-from lsfm_cell_mapping.pointcloud.signal_points import extract_signal_points_from_mask_stack
-from lsfm_cell_mapping.models.metadata import DatasetMetadata
-from lsfm_cell_mapping.qc import write_centroid_images
+from spatialsignal.io.masks import find_mask_files
+from spatialsignal.pointcloud.centroids import extract_centroids_from_mask_stack
+from spatialsignal.pointcloud.signal_points import extract_signal_points_from_mask_stack
+from spatialsignal.models.metadata import DatasetMetadata
+from spatialsignal.qc import write_centroid_images
 
 
 def make_subject_output_stem(subject_name: str) -> str:

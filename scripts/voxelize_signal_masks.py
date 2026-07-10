@@ -7,11 +7,11 @@ from pathlib import Path
 
 import numpy as np
 
-from lsfm_cell_mapping.io.masks import find_mask_files
-from lsfm_cell_mapping.models import SpaceDefinition
-from lsfm_cell_mapping.pointcloud.build import make_subject_output_stem
-from lsfm_cell_mapping.utils import load_toml_config, require_config_value
-from lsfm_cell_mapping.voxelization import (
+from spatialsignal.io.masks import find_mask_files
+from spatialsignal.models import SpaceDefinition
+from spatialsignal.pointcloud.build import make_subject_output_stem
+from spatialsignal.utils import load_toml_config, require_config_value
+from spatialsignal.voxelization import (
     build_nifti_ras_affine,
     make_subject_analysis_space,
     voxelize_signal_masks_to_fraction_map,

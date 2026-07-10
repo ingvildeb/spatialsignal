@@ -210,7 +210,7 @@ class DatasetMetadata:
         mask_files: list[Path],
         representation_type: str = "point_centroids",
         axis_labels: list[str] | None = None,
-        schema_name: str = "lsfm_cell_mapping.dataset_metadata",
+        schema_name: str = "spatialsignal.dataset_metadata",
         schema_version: str = "0.1.0",
     ) -> "DatasetMetadata":
         """Build dataset metadata from a stack of mask files in image voxel space."""
@@ -243,7 +243,7 @@ def build_dataset_metadata(
     mask_files: list[Path],
     representation_type: str = "point_centroids",
     axis_labels: list[str] | None = None,
-    schema_name: str = "lsfm_cell_mapping.dataset_metadata",
+    schema_name: str = "spatialsignal.dataset_metadata",
     schema_version: str = "0.1.0",
 ) -> dict[str, Any]:
     """Build dataset metadata for a spatial dataset in image voxel space."""

@@ -2,13 +2,13 @@ import numpy as np
 import pandas as pd
 import tifffile
 
-from lsfm_cell_mapping.models import (
+from spatialsignal.models import (
     DataRepresentation,
     DatasetMetadata,
     PointCloudDataset,
     SpaceDefinition,
 )
-from lsfm_cell_mapping.voxelization import (
+from spatialsignal.voxelization import (
     build_nifti_ras_affine,
     build_fraction_map_from_counts,
     compute_native_voxel_denominator_grid,
@@ -29,7 +29,7 @@ def _make_centroid_dataset() -> PointCloudDataset:
         ]
     )
     metadata = DatasetMetadata(
-        schema_name="lsfm_cell_mapping.dataset_metadata",
+        schema_name="spatialsignal.dataset_metadata",
         schema_version="0.1.0",
         space=SpaceDefinition(
             space_name="native_space",
@@ -134,7 +134,7 @@ def test_voxelize_to_space_allows_multiple_points_same_target_voxel() -> None:
         ]
     )
     metadata = DatasetMetadata(
-        schema_name="lsfm_cell_mapping.dataset_metadata",
+        schema_name="spatialsignal.dataset_metadata",
         schema_version="0.1.0",
         space=SpaceDefinition(
             space_name="native_space",
@@ -198,7 +198,7 @@ def test_cleaned_object_table_can_follow_shared_voxelization_path() -> None:
         ]
     )
     metadata = DatasetMetadata(
-        schema_name="lsfm_cell_mapping.dataset_metadata",
+        schema_name="spatialsignal.dataset_metadata",
         schema_version="0.1.0",
         space=SpaceDefinition(
             space_name="native_space",

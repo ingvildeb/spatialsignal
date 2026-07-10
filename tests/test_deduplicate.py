@@ -1,13 +1,13 @@
 import pandas as pd
 
-from lsfm_cell_mapping.pointcloud import (
+from spatialsignal.pointcloud import (
     CLEANED_OBJECT_REQUIRED_COLUMNS,
     SpaceDefinition,
     EDGE_COLUMNS,
     deduplicate_across_planes,
     summarize_deduplication_result,
 )
-from lsfm_cell_mapping.qc import select_qc_plane_pairs
+from spatialsignal.qc import select_qc_plane_pairs
 
 
 def test_deduplicate_across_planes_builds_expected_edges_membership_and_objects() -> None:

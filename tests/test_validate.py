@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from lsfm_cell_mapping.pointcloud import (
+from spatialsignal.pointcloud import (
     POINTCLOUD_REQUIRED_COLUMNS,
     compare_pointcloud_tables,
     load_canonical_pointcloud_csv,

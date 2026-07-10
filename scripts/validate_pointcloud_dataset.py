@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from lsfm_cell_mapping.pointcloud import PointCloudDataset
+from spatialsignal.pointcloud import PointCloudDataset
 
 
 def parse_args() -> argparse.Namespace:

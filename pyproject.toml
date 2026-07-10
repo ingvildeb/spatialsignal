@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "lsfm-cell-mapping"
+name = "spatialsignal"
 version = "0.1.0"
 description = "Spatial point-cloud and mapping toolkit for whole-brain segmented cells"
 readme = "README.md"

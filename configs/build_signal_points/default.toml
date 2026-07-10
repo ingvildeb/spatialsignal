@@ -6,7 +6,7 @@ mask_dir = 'z:\Labmembers\Ingvild\RM1\microglia_ramification_model\analysis_test
 pattern = "*.tif*"
 
 [output]
-out_dir = 'C:\Users\SmartBrain_32C_TR\Documents\GitHub\standard_test_data\lsfm_cell_mapping\build_signal_points'
+out_dir = 'C:\Users\SmartBrain_32C_TR\Documents\GitHub\standard_test_data\spatialsignal\build_signal_points'
 
 [space]
 name = "subject_space"

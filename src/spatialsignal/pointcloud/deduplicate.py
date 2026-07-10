@@ -8,8 +8,8 @@ import numpy as np
 import pandas as pd
 from scipy.spatial import cKDTree
 
-from lsfm_cell_mapping.models.datasets import _validate_required_columns
-from lsfm_cell_mapping.models.metadata import SpaceDefinition
+from spatialsignal.models.datasets import _validate_required_columns
+from spatialsignal.models.metadata import SpaceDefinition
 
 
 EDGE_COLUMNS = [

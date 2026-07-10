@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 import tifffile
 
-from lsfm_cell_mapping.io.masks import assign_slices
+from spatialsignal.io.masks import assign_slices
 
 
 SIGNAL_POINT_REQUIRED_COLUMNS = ["point_id", "x", "y", "z"]

@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from lsfm_cell_mapping.pointcloud import (
+from spatialsignal.pointcloud import (
     compare_pointcloud_tables,
     load_canonical_pointcloud_csv,
     load_legacy_matlab_centroids_csv,

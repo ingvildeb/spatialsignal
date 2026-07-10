@@ -9,7 +9,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from lsfm_cell_mapping.models.metadata import DatasetMetadata, SpaceDefinition
+from spatialsignal.models.metadata import DatasetMetadata, SpaceDefinition
 
 
 POINTCLOUD_REQUIRED_COLUMNS = ["detection_id", "seg_num", "x", "y", "z"]
