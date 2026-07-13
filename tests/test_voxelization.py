@@ -252,9 +252,9 @@ def test_build_nifti_ras_affine_converts_brainglobe_origin_convention() -> None:
 
     expected = np.array(
         [
-            [20.0, 0.0, 0.0, 0.0],
-            [0.0, -25.0, 0.0, 0.0],
-            [0.0, 0.0, -30.0, 0.0],
+            [0.02, 0.0, 0.0, 0.0],
+            [0.0, -0.025, 0.0, 0.0],
+            [0.0, 0.0, -0.03, 0.0],
             [0.0, 0.0, 0.0, 1.0],
         ]
     )
@@ -276,9 +276,9 @@ def test_build_nifti_ras_affine_handles_nontrivial_axis_world_mapping() -> None:
 
     expected = np.array(
         [
-            [0.0, 0.0, 30.0, 0.0],
-            [-20.0, 0.0, 0.0, 0.0],
-            [0.0, -25.0, 0.0, 0.0],
+            [0.0, 0.0, 0.03, 0.0],
+            [-0.02, 0.0, 0.0, 0.0],
+            [0.0, -0.025, 0.0, 0.0],
             [0.0, 0.0, 0.0, 1.0],
         ]
     )

@@ -115,7 +115,7 @@ The planned atlas-aware workflow is:
 1. start from subject-space objects or voxel maps
 2. consume an `atlasspace` registration output folder
 3. use the warped annotation in subject space
-4. summarize counts, burden, volume, and density by region
+4. summarize object counts, region volume, density, and object morphology by region
 
 This keeps the biological measurements tied to the subject's own tissue geometry.
 

@@ -79,7 +79,7 @@ cohort aggregation helpers, or hotspot-style analyses.
 1. Documentation and naming cleanup
 2. Registration-folder integration
 3. Subject-space point/object-to-region assignment
-4. Subject-space per-region count, burden, volume, and density summaries
+4. Subject-space per-region object count, region volume, density, and morphology summaries
 5. Subject-space semantic summaries
 6. Reference-space visualization outputs
 7. Jacobian prototype lane

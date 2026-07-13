@@ -14,6 +14,7 @@ quantification.
 - dense signal-support point tables from binary semantic masks
 - cross-plane deduplication of repeated detections
 - subject-space voxelization into count maps and fraction maps
+- subject-space object-to-region assignment with atlas names, counts, densities, and morphology
 - explicit metadata sidecars describing space, representation, and processing
 - validation against legacy MATLAB centroid CSV outputs
 
@@ -151,6 +152,9 @@ use the API on local files:
 - `examples/build_pointcloud.py`
 - `examples/build_signal_points.py`
 - `examples/deduplicate_across_planes.py`
+- `examples/quantify_objects_by_region.py`
+- `examples/test_python_workflow.py`
+- `examples/test_region_quantification_workflow.py`
 - `examples/validate_against_matlab.py`
 - `examples/validate_pointcloud_dataset.py`
 - `examples/voxelize_pointcloud.py`
@@ -159,6 +163,10 @@ use the API on local files:
 
 These are intended as examples and testing helpers rather than the canonical
 package interface.
+
+Region-report workflows use `atlaslevels` automatically. Set the annotation ID
+namespace to `allen` or `kimlab16bit`; the saved report retains the annotation's
+original `region_id` and adds the canonical Allen ID, acronym, name, and color.
 
 ## Documentation
 

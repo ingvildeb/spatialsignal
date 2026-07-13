@@ -6,13 +6,23 @@ from dataclasses import dataclass
 from dataclasses import replace
 from pathlib import Path
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
+import pandas as pd
 
-from spatialsignal.models import PointCloudDataset, ProcessingProvenance, SpaceDefinition, VoxelMap
-from spatialsignal.pointcloud.deduplicate import DeduplicationResult, summarize_deduplication_result
-from spatialsignal.voxelization import build_nifti_ras_affine
+from spatialsignal.models import (
+    DataRepresentation,
+    DatasetMetadata,
+    PointCloudDataset,
+    ProcessingProvenance,
+    SpaceDefinition,
+    VoxelMap,
+)
+from spatialsignal.voxelization.nifti import build_nifti_ras_affine
+
+if TYPE_CHECKING:
+    from spatialsignal.pointcloud.deduplicate import DeduplicationResult
 
 
 @dataclass(frozen=True)
@@ -33,6 +43,15 @@ class DeduplicationOutputPaths:
     objects_json: Path
     membership_csv: Path
     edges_csv: Path | None
+
+
+@dataclass(frozen=True)
+class InstanceRegionQuantificationOutputPaths:
+    """Paths written for instance region-assignment outputs."""
+
+    assigned_objects_csv: Path
+    assigned_objects_json: Path
+    region_summary_csv: Path
 
 
 def make_subject_output_stem(subject_name: str) -> str:
@@ -59,6 +78,7 @@ def write_nifti_voxel_map(
 
     affine = build_nifti_ras_affine(space)
     image = nib.Nifti1Image(data_xyz, affine)
+    image.header.set_xyzt_units(xyz="mm")
     output_path.parent.mkdir(parents=True, exist_ok=True)
     nib.save(image, str(output_path))
     return True
@@ -106,6 +126,8 @@ def save_deduplication_outputs(
 ) -> DeduplicationOutputPaths:
     """Save cleaned-object tables and provenance for deduplication outputs."""
 
+    from spatialsignal.pointcloud.deduplicate import summarize_deduplication_result
+
     if output_stem is None:
         output_stem = make_subject_output_stem(dataset.subject_name)
     if source_name is None:
@@ -123,7 +145,14 @@ def save_deduplication_outputs(
         parameters=parameters,
         summary=summarize_deduplication_result(dataset.points, result),
     )
-    objects_metadata = replace(dataset.metadata, processing=processing_metadata)
+    objects_metadata = replace(
+        dataset.metadata,
+        representation=DataRepresentation(
+            kind="point_cloud",
+            representation_type="cleaned_objects",
+        ),
+        processing=processing_metadata,
+    )
 
     result.objects.to_csv(objects_csv, index=False)
     objects_metadata.to_json(objects_json)
@@ -136,4 +165,58 @@ def save_deduplication_outputs(
         objects_json=objects_json,
         membership_csv=membership_csv,
         edges_csv=edges_csv,
+    )
+
+
+def save_instance_region_quantification_outputs(
+    assigned_objects: pd.DataFrame,
+    region_summary: pd.DataFrame,
+    metadata: DatasetMetadata,
+    out_dir: Path,
+    *,
+    source_name: str,
+    parameters: dict[str, Any] | None = None,
+    output_stem: str | None = None,
+) -> InstanceRegionQuantificationOutputPaths:
+    """Save region-assigned object tables and per-region summaries."""
+
+    subject_name = source_name.removesuffix("_objects.csv").removesuffix(".csv")
+    if output_stem is None:
+        output_stem = make_subject_output_stem(subject_name)
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    assigned_objects_csv = out_dir / f"{output_stem}_objects_with_regions.csv"
+    assigned_objects_json = out_dir / f"{output_stem}_objects_with_regions_space.json"
+    region_summary_csv = out_dir / f"{output_stem}_region_summary.csv"
+
+    processing_metadata = ProcessingProvenance(
+        stage="assign_objects_to_regions",
+        source_name=source_name,
+        parameters=parameters,
+        summary={
+            "n_objects": int(len(assigned_objects)),
+            "n_assigned": int((assigned_objects["assignment_status"] == "assigned").sum()),
+            "n_background": int((assigned_objects["assignment_status"] == "background").sum()),
+            "n_out_of_bounds": int(
+                (assigned_objects["assignment_status"] == "out_of_bounds").sum()
+            ),
+        },
+    )
+    assigned_metadata = replace(
+        metadata,
+        representation=DataRepresentation(
+            kind="point_cloud",
+            representation_type="objects_with_region_ids",
+        ),
+        processing=processing_metadata,
+    )
+
+    assigned_objects.to_csv(assigned_objects_csv, index=False)
+    assigned_metadata.to_json(assigned_objects_json)
+    region_summary.to_csv(region_summary_csv, index=False)
+
+    return InstanceRegionQuantificationOutputPaths(
+        assigned_objects_csv=assigned_objects_csv,
+        assigned_objects_json=assigned_objects_json,
+        region_summary_csv=region_summary_csv,
     )

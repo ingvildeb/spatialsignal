@@ -13,7 +13,9 @@ def build_nifti_ras_affine(space: SpaceDefinition) -> np.ndarray:
     ``SpaceDefinition.orientation`` uses the BrainGlobe convention: each letter
     describes the anatomical side at voxel index 0 for the corresponding axis.
     This helper converts that origin-based convention into NIfTI's affine-based
-    axis-direction convention in an RAS+ world.
+    axis-direction convention in an RAS+ world. Internally, spatialsignal stores
+    voxel sizes in micrometers, while NIfTI affines are conventionally expressed
+    in millimeters, so the diagonal terms are converted from um to mm here.
     """
 
     if len(space.orientation) != 3:
@@ -44,6 +46,6 @@ def build_nifti_ras_affine(space: SpaceDefinition) -> np.ndarray:
                 f"Unsupported orientation letter {orient_letter} in {space.orientation}"
             )
         world_axis, sign = origin_letter_to_world[orient_letter]
-        affine[world_axis, axis_index] = sign * float(resolution_um)
+        affine[world_axis, axis_index] = sign * (float(resolution_um) / 1000.0)
 
     return affine

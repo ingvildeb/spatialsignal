@@ -87,6 +87,6 @@ The next major workflow extension is expected to be atlas-aware subject-space qu
 1. load an `atlasspace` registration output folder
 2. use the warped annotation in subject space
 3. assign objects or voxelized signal to regions
-4. summarize subject-space counts, burden, volume, and density by region
+4. summarize subject-space object counts, region volume, density, and morphology by region
 
 The detailed plan for that work lives in `docs/roadmap.md`.
