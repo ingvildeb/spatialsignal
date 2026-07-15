@@ -84,6 +84,7 @@ For the current workflows, the main representation types are:
 - `point_centroids`: one row per centroid-like instance summary
 - `signal_points`: one row per signal-support point from a binary semantic mask
 - `count_map`: a voxelized count representation
+- `density_map`: object counts divided by physical voxel volume in mm3
 - `fraction_map`: a voxelized semantic support fraction representation
 
 ## Cleaned Object Outputs

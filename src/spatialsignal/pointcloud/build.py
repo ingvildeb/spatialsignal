@@ -24,7 +24,9 @@ def build_pointcloud_from_masks(
     orientation: str,
     resolution_um: list[float],
     representation_type: str = "point_centroids",
-    pattern: str = "masks_*.tif*",
+    extensions: tuple[str, ...] = (".tif", ".tiff"),
+    prefix: str | None = None,
+    suffix: str | None = None,
     indexing: str = "zero_based",
     slice_start: int | None = None,
     max_workers: int | None = 1,
@@ -37,7 +39,12 @@ def build_pointcloud_from_masks(
     indexing = validate_indexing(indexing)
     resolved_slice_start = resolve_slice_start(indexing, slice_start)
 
-    mask_files = find_mask_files(mask_dir, pattern=pattern)
+    mask_files = find_mask_files(
+        mask_dir,
+        extensions=extensions,
+        prefix=prefix,
+        suffix=suffix,
+    )
     output_stem = make_subject_output_stem(subject_name)
     csv_path = out_dir / f"{output_stem}_pointcloud.csv"
     metadata_path = out_dir / f"{output_stem}_pointcloud_space.json"
@@ -90,7 +97,9 @@ def build_signal_points_from_masks(
     space_name: str,
     orientation: str,
     resolution_um: list[float],
-    pattern: str = "*.tif*",
+    extensions: tuple[str, ...] = (".tif", ".tiff"),
+    prefix: str | None = None,
+    suffix: str | None = None,
     indexing: str = "zero_based",
     slice_start: int | None = None,
     max_workers: int | None = 1,
@@ -102,7 +111,12 @@ def build_signal_points_from_masks(
     indexing = validate_indexing(indexing)
     resolved_slice_start = resolve_slice_start(indexing, slice_start)
 
-    mask_files = find_mask_files(mask_dir, pattern=pattern)
+    mask_files = find_mask_files(
+        mask_dir,
+        extensions=extensions,
+        prefix=prefix,
+        suffix=suffix,
+    )
     output_stem = make_subject_output_stem(subject_name)
     csv_path = out_dir / f"{output_stem}_signal_points.csv"
     metadata_path = out_dir / f"{output_stem}_signal_points_space.json"

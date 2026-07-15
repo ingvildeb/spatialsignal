@@ -9,7 +9,6 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import tifffile
 
 from spatialsignal.io.masks import assign_slices
 from spatialsignal.pointcloud._indexing import (
@@ -17,6 +16,7 @@ from spatialsignal.pointcloud._indexing import (
     resolve_slice_start,
     validate_indexing,
 )
+from spatialsignal.utils.images import read_2d_mask
 
 
 SIGNAL_POINT_REQUIRED_COLUMNS = ["point_id", "x", "y", "z"]
@@ -32,7 +32,7 @@ def extract_signal_points_from_mask(
 
     indexing = validate_indexing(indexing)
 
-    mask = tifffile.imread(mask_path)
+    mask = read_2d_mask(mask_path)
     rows, cols = np.nonzero(mask)
     if rows.size == 0:
         return pd.DataFrame(columns=SIGNAL_POINT_REQUIRED_COLUMNS)

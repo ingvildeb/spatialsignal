@@ -29,9 +29,9 @@ if TYPE_CHECKING:
 class VoxelMapOutputPaths:
     """Paths written for a saved voxel map."""
 
-    array_path: Path
+    array_path: Path | None
     metadata_path: Path
-    nifti_path: Path
+    nifti_path: Path | None
     nifti_written: bool
 
 
@@ -90,21 +90,38 @@ def save_voxel_map_outputs(
     *,
     name_suffix: str,
     output_stem: str | None = None,
+    formats: tuple[str, ...] = ("npy", "nifti"),
 ) -> VoxelMapOutputPaths:
-    """Save a voxel map as NumPy, metadata JSON, and optional NIfTI."""
+    """Save a voxel map in selected formats plus a metadata JSON sidecar."""
+
+    requested_formats = set(formats)
+    if not requested_formats:
+        raise ValueError("formats must contain at least one output format")
+    unsupported_formats = requested_formats.difference({"npy", "nifti"})
+    if unsupported_formats:
+        raise ValueError(f"Unsupported voxel-map output formats: {sorted(unsupported_formats)}")
 
     if output_stem is None:
         output_stem = make_subject_output_stem(voxel_map.subject_name)
 
     out_dir.mkdir(parents=True, exist_ok=True)
     base_path = out_dir / f"{output_stem}_{name_suffix}"
-    array_path = base_path.with_suffix(".npy")
-    nifti_path = out_dir / f"{output_stem}_{name_suffix}.nii.gz"
+    array_path = base_path.with_suffix(".npy") if "npy" in requested_formats else None
+    nifti_path = (
+        out_dir / f"{output_stem}_{name_suffix}.nii.gz"
+        if "nifti" in requested_formats
+        else None
+    )
     metadata_path = out_dir / f"{output_stem}_{name_suffix}_space.json"
 
-    np.save(array_path, voxel_map.data)
+    if array_path is not None:
+        np.save(array_path, voxel_map.data)
     voxel_map.metadata.to_json(metadata_path)
-    nifti_written = write_nifti_voxel_map(voxel_map.data, voxel_map.space, nifti_path)
+    nifti_written = (
+        write_nifti_voxel_map(voxel_map.data, voxel_map.space, nifti_path)
+        if nifti_path is not None
+        else False
+    )
 
     return VoxelMapOutputPaths(
         array_path=array_path,

@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
-import tifffile
 
 from spatialsignal.models import (
     DataRepresentation,
@@ -15,6 +14,7 @@ from spatialsignal.models import (
     SpaceDefinition,
     VoxelMap,
 )
+from spatialsignal.utils.images import read_2d_mask
 from .grids import (
     accumulate_count_map,
     build_fraction_map_from_counts,
@@ -47,6 +47,7 @@ def voxelize_point_centroids_to_count_map(
         representation=DataRepresentation(
             kind="voxel_map",
             representation_type="count_map",
+            value_units="objects_per_voxel",
         ),
         processing=ProcessingProvenance(
             stage="voxelize_to_space",
@@ -84,7 +85,10 @@ def voxelize_to_space(
     kind = dataset.metadata.representation.kind
     representation_type = dataset.metadata.representation.representation_type
 
-    if kind == "point_cloud" and representation_type == "point_centroids":
+    if kind == "point_cloud" and representation_type in {
+        "point_centroids",
+        "cleaned_objects",
+    }:
         return voxelize_point_centroids_to_count_map(
             dataset,
             target_space,
@@ -92,8 +96,8 @@ def voxelize_to_space(
         )
 
     raise NotImplementedError(
-        "voxelize_to_space currently supports only "
-        "kind='point_cloud' with representation_type='point_centroids'"
+        "voxelize_to_space currently supports kind='point_cloud' with "
+        "representation_type='point_centroids' or 'cleaned_objects'"
     )
 
 
@@ -196,7 +200,7 @@ def accumulate_signal_masks_to_target_counts(
     target_resolution = np.asarray(target_space.resolution_um, dtype=np.float64)
 
     for slice_zero_based, mask_path in enumerate(mask_files):
-        mask = tifffile.imread(mask_path)
+        mask = read_2d_mask(mask_path)
         rows, cols = np.nonzero(mask)
         signal_points += int(rows.size)
         if rows.size:
@@ -230,10 +234,10 @@ def _validate_centroid_pointcloud(dataset: PointCloudDataset) -> None:
     representation = dataset.metadata.representation
     if representation.kind != "point_cloud":
         raise ValueError(f"Expected kind='point_cloud', got {representation.kind}")
-    if representation.representation_type != "point_centroids":
+    if representation.representation_type not in {"point_centroids", "cleaned_objects"}:
         raise ValueError(
             "voxelize_point_centroids_to_count_map requires "
-            "representation_type='point_centroids', got "
+            "representation_type='point_centroids' or 'cleaned_objects', got "
             f"{representation.representation_type}"
         )
 

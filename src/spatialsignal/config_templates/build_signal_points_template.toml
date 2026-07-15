@@ -1,5 +1,5 @@
 # spatialsignal_template_id = build_signal_points
-# spatialsignal_template_revision = 2026-07-10
+# spatialsignal_template_revision = 2026-07-14
 # Copy this template to a local TOML file and edit the paths for your dataset.
 
 [subject]
@@ -7,7 +7,9 @@ name = "Example_Subject"
 
 [input]
 mask_dir = 'C:\path\to\semantic_masks'
-pattern = "*.tif*"
+# extensions = [".tif", ".tiff"]
+# prefix = "optional_prefix_"
+# suffix = "_optional_suffix"
 
 [output]
 out_dir = 'C:\path\to\signal_point_output'

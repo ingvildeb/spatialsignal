@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-import tifffile
+from spatialsignal.utils.images import read_2d_mask
 
 
 @dataclass
@@ -72,7 +72,7 @@ class SpaceDefinition:
         if len(axis_labels) != 3:
             raise ValueError(f"axis_labels must have length 3, got {axis_labels}")
 
-        first_mask = tifffile.imread(mask_files[0])
+        first_mask = read_2d_mask(mask_files[0])
         shape = [int(first_mask.shape[1]), int(first_mask.shape[0]), len(mask_files)]
 
         return cls(
@@ -92,14 +92,18 @@ class DataRepresentation:
 
     kind: str
     representation_type: str
+    value_units: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Convert the data representation to a plain dictionary."""
 
-        return {
+        data = {
             "kind": self.kind,
             "representation_type": self.representation_type,
         }
+        if self.value_units is not None:
+            data["value_units"] = self.value_units
+        return data
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "DataRepresentation":
@@ -108,6 +112,7 @@ class DataRepresentation:
         return cls(
             kind=data["kind"],
             representation_type=data["representation_type"],
+            value_units=data.get("value_units"),
         )
 
 

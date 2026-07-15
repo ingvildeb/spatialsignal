@@ -7,15 +7,25 @@ from pathlib import Path
 from natsort import natsorted
 
 
-def find_mask_files(mask_dir: Path, pattern: str = "masks_*.tif*") -> list[Path]:
+def find_mask_files(
+    mask_dir: Path,
+    *,
+    extensions: tuple[str, ...] = (".tif", ".tiff"),
+    prefix: str | None = None,
+    suffix: str | None = None,
+) -> list[Path]:
     """Return naturally sorted mask files from a directory.
 
     Parameters
     ----------
     mask_dir:
         Directory containing Cellpose mask images.
-    pattern:
-        Glob pattern used to identify mask files.
+    extensions:
+        Accepted file extensions. Matching is case-insensitive.
+    prefix:
+        Optional filename prefix used to filter files.
+    suffix:
+        Optional filename suffix immediately before the file extension.
 
     Returns
     -------
@@ -35,13 +45,43 @@ def find_mask_files(mask_dir: Path, pattern: str = "masks_*.tif*") -> list[Path]
     if not mask_dir.is_dir():
         raise NotADirectoryError(f"Mask path is not a directory: {mask_dir}")
 
-    mask_files = natsorted(mask_dir.glob(pattern))
+    normalized_extensions = _normalize_extensions(extensions)
+    mask_files = natsorted(
+        path
+        for path in mask_dir.iterdir()
+        if path.is_file()
+        and path.suffix.lower() in normalized_extensions
+        and (prefix is None or path.stem.startswith(prefix))
+        and (suffix is None or path.stem.endswith(suffix))
+    )
     if not mask_files:
+        filters = [f"extensions={tuple(sorted(normalized_extensions))!r}"]
+        if prefix is not None:
+            filters.append(f"prefix={prefix!r}")
+        if suffix is not None:
+            filters.append(f"suffix={suffix!r}")
         raise FileNotFoundError(
-            f"No mask files matching pattern '{pattern}' were found in {mask_dir}"
+            f"No mask files matching {', '.join(filters)} were found in {mask_dir}"
         )
 
     return list(mask_files)
+
+
+def _normalize_extensions(extensions: tuple[str, ...]) -> set[str]:
+    """Validate and normalize literal file extensions."""
+
+    if not extensions:
+        raise ValueError("extensions must contain at least one file extension")
+
+    normalized: set[str] = set()
+    for extension in extensions:
+        if not extension or any(character in extension for character in "*?[]"):
+            raise ValueError(
+                "extensions must contain literal file extensions without glob characters, "
+                f"got {extension!r}"
+            )
+        normalized.add(extension.lower() if extension.startswith(".") else f".{extension.lower()}")
+    return normalized
 
 
 def assign_slices(mask_files: list[Path], slice_start: int = 0) -> list[tuple[int, Path]]:

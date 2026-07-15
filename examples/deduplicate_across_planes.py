@@ -79,7 +79,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--qc-mask-dir",
         default=None,
-        help="Directory containing the original masks_*.tif* files used to build the raw point cloud.",
+        help="Directory containing the original TIFF masks used to build the raw point cloud.",
     )
     parser.add_argument(
         "--qc-output-dir",

@@ -6,7 +6,6 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import tifffile
 
 from spatialsignal.io.masks import assign_slices
 from spatialsignal.pointcloud._indexing import (
@@ -14,6 +13,7 @@ from spatialsignal.pointcloud._indexing import (
     resolve_slice_start,
     validate_indexing,
 )
+from spatialsignal.utils.images import read_2d_mask
 
 
 def pointcloud_slice_to_image(
@@ -61,7 +61,7 @@ def write_centroid_images(
     out_dir.mkdir(parents=True, exist_ok=True)
 
     for slice_index, mask_path in assign_slices(mask_files, slice_start=resolved_slice_start):
-        mask = tifffile.imread(mask_path)
+        mask = read_2d_mask(mask_path)
         slice_points = pointcloud.loc[pointcloud["z"] == slice_index]
         image = pointcloud_slice_to_image(
             slice_points,

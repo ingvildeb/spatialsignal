@@ -11,7 +11,7 @@ from spatialsignal.integration import (
     load_registration_annotation_volume,
     load_registration_brain_mask_volume,
 )
-from spatialsignal.models import DatasetMetadata, PointCloudDataset
+from spatialsignal.models import PointCloudDataset
 from spatialsignal.pointcloud import (
     build_pointcloud_from_masks,
     deduplicate_across_planes,
@@ -22,7 +22,11 @@ from spatialsignal.quantification import (
     remap_pointcloud_dataset_to_space,
     summarize_objects_by_region,
 )
-from spatialsignal.voxelization import make_subject_analysis_space, voxelize_to_space
+from spatialsignal.voxelization import (
+    count_map_to_density_map,
+    make_subject_analysis_space,
+    voxelize_to_space,
+)
 
 MASK_DIR = Path(
     r"Z:\LSFM\2026\2026_03\2026_03_16\20260316_10_38_12_NB_101362_F_P14_B6NJ_LAS_488Lectin_561NeuN_640Iba1_4x_4umstep_Destripe_DONE\_02_ml_result\ch2"
@@ -75,13 +79,6 @@ if __name__ == "__main__":
         max_n_planes=MAX_N_PLANES,
     )
 
-    analysis_space = make_subject_analysis_space(
-        dataset.space,
-        analysis_resolution_um=ANALYSIS_RESOLUTION_UM,
-        space_name=ANALYSIS_SPACE_NAME,
-    )
-    voxel_map = voxelize_to_space(dataset, analysis_space)
-
     dedup_paths = save_deduplication_outputs(
         dataset,
         result,
@@ -95,37 +92,53 @@ if __name__ == "__main__":
         output_stem=output_stem,
         write_edge_table=True,
     )
-    voxel_paths = save_voxel_map_outputs(
-        voxel_map,
+    objects_dataset = PointCloudDataset.from_files(
+        dedup_paths.objects_csv,
+        dedup_paths.objects_json,
+        subject_name=SUBJECT_NAME,
+    )
+    objects_dataset.validate_spatial_points()
+    analysis_space = make_subject_analysis_space(
+        objects_dataset.space,
+        analysis_resolution_um=ANALYSIS_RESOLUTION_UM,
+        space_name=ANALYSIS_SPACE_NAME,
+    )
+    count_map = voxelize_to_space(objects_dataset, analysis_space)
+    density_map = count_map_to_density_map(count_map)
+    count_paths = save_voxel_map_outputs(
+        count_map,
         OUT_DIR,
         name_suffix="count_map",
         output_stem=output_stem,
     )
+    density_paths = save_voxel_map_outputs(
+        density_map,
+        OUT_DIR,
+        name_suffix="density_map",
+        output_stem=output_stem,
+    )
 
     print(len(result.objects))
-    print(voxel_map.data.shape)
+    print(count_map.data.shape)
     print(dedup_paths.objects_csv)
     print(dedup_paths.objects_json)
     print(dedup_paths.membership_csv)
     if dedup_paths.edges_csv is not None:
         print(dedup_paths.edges_csv)
-    print(voxel_paths.array_path)
-    print(voxel_paths.metadata_path)
-    if voxel_paths.nifti_written:
-        print(voxel_paths.nifti_path)
+    print(count_paths.array_path)
+    print(count_paths.metadata_path)
+    if count_paths.nifti_written:
+        print(count_paths.nifti_path)
+    print(density_paths.array_path)
+    print(density_paths.metadata_path)
+    if density_paths.nifti_written:
+        print(density_paths.nifti_path)
 
     if REGISTRATION_DIR is not None:
         registration = load_atlasspace_registration_folder(REGISTRATION_DIR)
         annotation_volume = load_registration_annotation_volume(registration)
         brain_mask_volume = load_registration_brain_mask_volume(registration)
 
-        objects_metadata = DatasetMetadata.from_json(dedup_paths.objects_json)
-        objects_dataset = PointCloudDataset(
-            subject_name=SUBJECT_NAME,
-            points=result.objects,
-            metadata=objects_metadata,
-        )
-        objects_dataset.validate_spatial_points()
         remapped_dataset = remap_pointcloud_dataset_to_space(
             objects_dataset,
             annotation_volume.space,

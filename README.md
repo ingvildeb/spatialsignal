@@ -52,12 +52,17 @@ A minimal subject-space workflow looks like this:
 ```python
 from pathlib import Path
 
+from spatialsignal.io import save_deduplication_outputs
 from spatialsignal.pointcloud import (
     PointCloudDataset,
     build_pointcloud_from_masks,
     deduplicate_across_planes,
 )
-from spatialsignal.voxelization import make_subject_analysis_space, voxelize_to_space
+from spatialsignal.voxelization import (
+    count_map_to_density_map,
+    make_subject_analysis_space,
+    voxelize_to_space,
+)
 
 MASK_DIR = Path("masks")
 OUT_DIR = Path("outputs")
@@ -94,16 +99,24 @@ if __name__ == "__main__":
         max_xy_distance_um=3.0,
         max_n_planes=2,
     )
+    dedup_paths = save_deduplication_outputs(dataset, result, OUT_DIR)
+    objects = PointCloudDataset.from_files(
+        dedup_paths.objects_csv,
+        dedup_paths.objects_json,
+        subject_name=SUBJECT_NAME,
+    )
 
     analysis_space = make_subject_analysis_space(
-        dataset.space,
+        objects.space,
         analysis_resolution_um=[20.0, 20.0, 20.0],
         space_name="subject_analysis_space",
     )
-    voxel_map = voxelize_to_space(dataset, analysis_space)
+    count_map = voxelize_to_space(objects, analysis_space)
+    density_map = count_map_to_density_map(count_map)
 
     print(len(result.objects))
-    print(voxel_map.data.shape)
+    print(count_map.data.shape)
+    print(density_map.metadata.representation.value_units)
 ```
 
 Use `max_workers=1` in notebooks and other interactive sessions. On Windows, if

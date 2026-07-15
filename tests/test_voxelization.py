@@ -7,11 +7,13 @@ from spatialsignal.models import (
     DatasetMetadata,
     PointCloudDataset,
     SpaceDefinition,
+    VoxelMap,
 )
 from spatialsignal.voxelization import (
     build_nifti_ras_affine,
     build_fraction_map_from_counts,
     compute_native_voxel_denominator_grid,
+    count_map_to_density_map,
     make_subject_analysis_space,
     pointcloud_to_zero_based_xyz,
     voxelize_signal_masks_to_fraction_map,
@@ -109,8 +111,168 @@ def test_voxelize_point_centroids_to_count_map_accumulates_counts() -> None:
     np.testing.assert_array_equal(voxel_map.data, expected)
     assert voxel_map.metadata.representation.kind == "voxel_map"
     assert voxel_map.metadata.representation.representation_type == "count_map"
+    assert voxel_map.metadata.representation.value_units == "objects_per_voxel"
     assert voxel_map.metadata.processing is not None
     assert voxel_map.metadata.processing.summary["total_count"] == 3
+
+
+def test_count_map_to_density_map_uses_anisotropic_voxel_volume() -> None:
+    space = SpaceDefinition(
+        space_name="subject_analysis_space",
+        orientation="las",
+        axis_labels=["x", "y", "z"],
+        indexing="zero_based",
+        units="voxel",
+        shape=[2, 1, 1],
+        resolution_um=[10.0, 20.0, 50.0],
+    )
+    count_map = VoxelMap(
+        subject_name="Test_Subject",
+        data=np.array([[[0]], [[2]]], dtype=np.uint32),
+        metadata=DatasetMetadata(
+            schema_name="spatialsignal.dataset_metadata",
+            schema_version="0.1.0",
+            space=space,
+            representation=DataRepresentation(
+                kind="voxel_map",
+                representation_type="count_map",
+                value_units="objects_per_voxel",
+            ),
+        ),
+    )
+
+    density_map = count_map_to_density_map(count_map)
+
+    np.testing.assert_allclose(
+        density_map.data,
+        np.array([[[0.0]], [[200_000.0]]], dtype=np.float32),
+    )
+    assert density_map.data.dtype == np.float32
+    assert density_map.metadata.representation.representation_type == "density_map"
+    assert density_map.metadata.representation.value_units == "objects_per_mm3"
+    assert density_map.metadata.processing is not None
+    assert np.isclose(
+        density_map.metadata.processing.parameters["voxel_volume_mm3"],
+        0.00001,
+    )
+    assert density_map.metadata.processing.summary["total_count"] == 2.0
+
+
+def test_count_map_to_density_map_rejects_non_count_representation() -> None:
+    count_map = VoxelMap(
+        subject_name="Test_Subject",
+        data=np.ones((1, 1, 1), dtype=np.float32),
+        metadata=DatasetMetadata(
+            schema_name="spatialsignal.dataset_metadata",
+            schema_version="0.1.0",
+            space=SpaceDefinition(
+                space_name="subject_analysis_space",
+                orientation="las",
+                axis_labels=["x", "y", "z"],
+                indexing="zero_based",
+                units="voxel",
+                shape=[1, 1, 1],
+                resolution_um=[20.0, 20.0, 20.0],
+            ),
+            representation=DataRepresentation(
+                kind="voxel_map",
+                representation_type="fraction_map",
+            ),
+        ),
+    )
+
+    with np.testing.assert_raises_regex(ValueError, "representation_type='count_map'"):
+        count_map_to_density_map(count_map)
+
+
+def test_voxel_map_from_files_validates_shape(tmp_path) -> None:
+    array_path = tmp_path / "count_map.npy"
+    metadata_path = tmp_path / "count_map_space.json"
+    np.save(array_path, np.ones((2, 1, 1), dtype=np.uint32))
+    DatasetMetadata(
+        schema_name="spatialsignal.dataset_metadata",
+        schema_version="0.1.0",
+        space=SpaceDefinition(
+            space_name="subject_analysis_space",
+            orientation="las",
+            axis_labels=["x", "y", "z"],
+            indexing="zero_based",
+            units="voxel",
+            shape=[2, 1, 1],
+            resolution_um=[20.0, 20.0, 20.0],
+        ),
+        representation=DataRepresentation(
+            kind="voxel_map",
+            representation_type="count_map",
+        ),
+    ).to_json(metadata_path)
+
+    loaded = VoxelMap.from_files(
+        array_path,
+        metadata_path,
+        subject_name="Test_Subject",
+    )
+
+    np.testing.assert_array_equal(loaded.data, np.ones((2, 1, 1), dtype=np.uint32))
+    assert loaded.subject_name == "Test_Subject"
+
+
+def test_voxel_map_from_nifti_round_trip(tmp_path) -> None:
+    from spatialsignal.io import save_voxel_map_outputs
+
+    voxel_map = VoxelMap(
+        subject_name="Test_Subject",
+        data=np.array([[[0]], [[3]]], dtype=np.uint32),
+        metadata=DatasetMetadata(
+            schema_name="spatialsignal.dataset_metadata",
+            schema_version="0.1.0",
+            space=SpaceDefinition(
+                space_name="subject_analysis_space",
+                orientation="las",
+                axis_labels=["x", "y", "z"],
+                indexing="zero_based",
+                units="voxel",
+                shape=[2, 1, 1],
+                resolution_um=[20.0, 20.0, 20.0],
+            ),
+            representation=DataRepresentation(
+                kind="voxel_map",
+                representation_type="count_map",
+            ),
+        ),
+    )
+    paths = save_voxel_map_outputs(
+        voxel_map,
+        tmp_path,
+        name_suffix="count_map",
+        formats=("nifti",),
+    )
+
+    assert paths.array_path is None
+    assert paths.nifti_path is not None
+    assert paths.nifti_written
+    loaded = VoxelMap.from_nifti(
+        paths.nifti_path,
+        paths.metadata_path,
+        subject_name="Test_Subject",
+    )
+
+    np.testing.assert_array_equal(loaded.data, voxel_map.data)
+    assert loaded.metadata.representation.representation_type == "count_map"
+
+
+def test_save_voxel_map_outputs_rejects_unknown_format(tmp_path) -> None:
+    from spatialsignal.io import save_voxel_map_outputs
+
+    voxel_map = voxelize_to_space(_make_centroid_dataset(), _make_target_space())
+
+    with np.testing.assert_raises_regex(ValueError, "Unsupported voxel-map output formats"):
+        save_voxel_map_outputs(
+            voxel_map,
+            tmp_path,
+            name_suffix="count_map",
+            formats=("csv",),
+        )
 
 
 def test_voxelize_to_space_dispatches_for_point_centroids() -> None:
@@ -211,7 +373,7 @@ def test_cleaned_object_table_can_follow_shared_voxelization_path() -> None:
         ),
         representation=DataRepresentation(
             kind="point_cloud",
-            representation_type="point_centroids",
+            representation_type="cleaned_objects",
         ),
     )
     dataset = PointCloudDataset(

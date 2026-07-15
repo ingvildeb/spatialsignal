@@ -7,8 +7,9 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import tifffile
-from natsort import natsorted
+
+from spatialsignal.io.masks import find_mask_files
+from spatialsignal.utils.images import read_2d_mask
 
 
 def select_qc_plane_pairs(
@@ -77,12 +78,18 @@ def write_pair_duplicate_qc(
     mask_dir: Path,
     plane_pairs: list[tuple[int, int]],
     output_dir: Path,
+    extensions: tuple[str, ...] = (".tif", ".tiff"),
+    prefix: str | None = None,
+    suffix: str | None = None,
 ) -> Path:
     """Write pairwise duplicate-vs-nonduplicate mask QC images."""
 
-    mask_files = natsorted(mask_dir.glob("masks_*.tif*"))
-    if not mask_files:
-        raise FileNotFoundError(f"No mask files found in {mask_dir}")
+    mask_files = find_mask_files(
+        mask_dir,
+        extensions=extensions,
+        prefix=prefix,
+        suffix=suffix,
+    )
 
     output_dir.mkdir(parents=True, exist_ok=True)
     z_values = sorted(points["z"].astype(int).unique())
@@ -143,8 +150,8 @@ def _write_single_pair_qc(
     object_plane_sets = plane_subset.groupby("object_id")["z"].agg(lambda s: set(map(int, s.tolist())))
     pair_object_ids = set(object_plane_sets.loc[object_plane_sets == selected_planes].index.tolist())
 
-    mask_a = tifffile.imread(mask_a_path)
-    mask_b = tifffile.imread(mask_b_path)
+    mask_a = read_2d_mask(mask_a_path)
+    mask_b = read_2d_mask(mask_b_path)
     _validate_plane_mask_alignment(mask_a, plane_points, plane_a)
     _validate_plane_mask_alignment(mask_b, plane_points, plane_b)
 

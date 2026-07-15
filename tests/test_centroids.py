@@ -3,6 +3,7 @@ import json
 
 import numpy as np
 import pandas as pd
+from PIL import Image
 import tifffile
 
 from spatialsignal.pointcloud import (
@@ -76,6 +77,20 @@ def test_extract_centroids_from_mask_returns_expected_zero_based_columns_and_val
     )
 
     pd.testing.assert_frame_equal(pointcloud.reset_index(drop=True), expected)
+
+
+def test_extract_centroids_from_png_mask(tmp_path: Path) -> None:
+    mask = np.zeros((3, 4), dtype=np.uint16)
+    mask[1, 2] = 1
+    mask_path = tmp_path / "masks_1.png"
+    Image.fromarray(mask).save(mask_path)
+
+    pointcloud = extract_centroids_from_mask(mask_path, slice_index=0)
+
+    assert len(pointcloud) == 1
+    assert pointcloud.loc[0, "x"] == 2
+    assert pointcloud.loc[0, "y"] == 1
+    assert pointcloud.loc[0, "area_px"] == 1
 
 
 def test_extract_centroids_from_mask_supports_one_based_legacy_export(

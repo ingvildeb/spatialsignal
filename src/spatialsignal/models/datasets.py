@@ -98,6 +98,52 @@ class VoxelMap:
     data: np.ndarray
     metadata: DatasetMetadata
 
+    @classmethod
+    def from_files(
+        cls,
+        array_path: Path,
+        json_path: Path,
+        *,
+        subject_name: str,
+    ) -> "VoxelMap":
+        """Load a voxel map from its NumPy array and metadata sidecar."""
+
+        data = np.load(array_path, allow_pickle=False)
+        metadata = DatasetMetadata.from_json(json_path)
+        if tuple(data.shape) != tuple(metadata.space.shape):
+            raise ValueError(
+                "Voxel-map array shape does not match metadata space shape: "
+                f"{data.shape} vs {tuple(metadata.space.shape)}"
+            )
+        return cls(subject_name=subject_name, data=data, metadata=metadata)
+
+    @classmethod
+    def from_nifti(
+        cls,
+        nifti_path: Path,
+        json_path: Path,
+        *,
+        subject_name: str,
+    ) -> "VoxelMap":
+        """Load a voxel map from NIfTI data and its metadata sidecar."""
+
+        try:
+            import nibabel as nib
+        except ModuleNotFoundError as exc:
+            raise ModuleNotFoundError(
+                "Loading NIfTI voxel maps requires nibabel"
+            ) from exc
+
+        image = nib.load(str(nifti_path))
+        data = np.asarray(image.dataobj)
+        metadata = DatasetMetadata.from_json(json_path)
+        if tuple(data.shape) != tuple(metadata.space.shape):
+            raise ValueError(
+                "Voxel-map NIfTI shape does not match metadata space shape: "
+                f"{data.shape} vs {tuple(metadata.space.shape)}"
+            )
+        return cls(subject_name=subject_name, data=data, metadata=metadata)
+
     @property
     def space(self) -> SpaceDefinition:
         """Convenience accessor for the voxel map spatial definition."""

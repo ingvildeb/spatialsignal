@@ -41,7 +41,10 @@ def main() -> int:
     subject_name = require_config_value(config, "subject", "name")
 
     mask_dir = Path(require_config_value(config, "input", "mask_dir"))
-    pattern = config.get("input", {}).get("pattern", "*.tif*")
+    input_config = config.get("input", {})
+    extensions = tuple(input_config.get("extensions", [".tif", ".tiff"]))
+    prefix = input_config.get("prefix")
+    suffix = input_config.get("suffix")
 
     out_dir = Path(require_config_value(config, "output", "out_dir"))
 
@@ -63,7 +66,12 @@ def main() -> int:
     show_progress = bool(config.get("processing", {}).get("show_progress", True))
     progress_interval = int(config.get("processing", {}).get("progress_interval", 25))
 
-    mask_files = find_mask_files(mask_dir, pattern=pattern)
+    mask_files = find_mask_files(
+        mask_dir,
+        extensions=extensions,
+        prefix=prefix,
+        suffix=suffix,
+    )
     source_space = SpaceDefinition.from_mask_files(
         space_name=source_space_name,
         orientation=orientation,

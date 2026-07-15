@@ -6,17 +6,36 @@ from spatialsignal.io import assign_slices, find_mask_files
 
 
 def test_find_mask_files_uses_natural_sort(tmp_path: Path) -> None:
-    (tmp_path / "masks_10.tif").touch()
-    (tmp_path / "masks_2.tif").touch()
-    (tmp_path / "masks_1.tif").touch()
+    (tmp_path / "plane_10.tiff").touch()
+    (tmp_path / "plane_2.tif").touch()
+    (tmp_path / "plane_1.TIF").touch()
 
     mask_files = find_mask_files(tmp_path)
 
     assert [path.name for path in mask_files] == [
-        "masks_1.tif",
-        "masks_2.tif",
-        "masks_10.tif",
+        "plane_1.TIF",
+        "plane_2.tif",
+        "plane_10.tiff",
     ]
+
+
+def test_find_mask_files_filters_by_prefix_and_suffix(tmp_path: Path) -> None:
+    (tmp_path / "masks_1_cellpose.tif").touch()
+    (tmp_path / "masks_2_other.tif").touch()
+    (tmp_path / "image_1_cellpose.tif").touch()
+
+    mask_files = find_mask_files(tmp_path, prefix="masks_", suffix="_cellpose")
+
+    assert [path.name for path in mask_files] == ["masks_1_cellpose.tif"]
+
+
+def test_find_mask_files_supports_configurable_extensions(tmp_path: Path) -> None:
+    (tmp_path / "mask_1.png").touch()
+    (tmp_path / "mask_2.tif").touch()
+
+    mask_files = find_mask_files(tmp_path, extensions=("png",))
+
+    assert [path.name for path in mask_files] == ["mask_1.png"]
 
 
 def test_find_mask_files_raises_when_no_files_match(tmp_path: Path) -> None:

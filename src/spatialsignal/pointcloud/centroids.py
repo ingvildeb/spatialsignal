@@ -9,7 +9,6 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import tifffile
 from skimage.measure import regionprops_table
 
 from spatialsignal.io.masks import assign_slices
@@ -18,6 +17,7 @@ from spatialsignal.pointcloud._indexing import (
     resolve_slice_start,
     validate_indexing,
 )
+from spatialsignal.utils.images import read_2d_mask
 
 
 POINTCLOUD_REQUIRED_COLUMNS = ["detection_id", "seg_num", "x", "y", "z"]
@@ -64,7 +64,7 @@ def extract_centroids_from_mask(
 
     indexing = validate_indexing(indexing)
 
-    mask = tifffile.imread(mask_path)
+    mask = read_2d_mask(mask_path)
     labels = np.unique(mask)
     labels = labels[labels != 0]
 
