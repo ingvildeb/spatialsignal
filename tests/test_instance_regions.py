@@ -54,6 +54,36 @@ def test_region_summary_reports_median_object_area_in_square_microns() -> None:
     assert "sum_mean_area_px" not in summary.columns
 
 
+def test_region_summary_reports_median_object_eccentricity_only() -> None:
+    space = SpaceDefinition(
+        space_name="subject",
+        orientation="las",
+        axis_labels=["x", "y", "z"],
+        indexing="zero_based",
+        units="voxel",
+        shape=[2, 1, 1],
+        resolution_um=[1.5, 1.5, 20.0],
+    )
+    assigned_objects = pd.DataFrame(
+        {
+            "x": [0, 0, 1],
+            "y": [0, 0, 0],
+            "z": [0, 0, 0],
+            "region_id": [1, 1, 2],
+            "mean_eccentricity": [0.2, 0.6, 0.9],
+        }
+    )
+    annotation = np.array([[[1]], [[2]]], dtype=np.int32)
+
+    summary = summarize_objects_by_region(assigned_objects, space, annotation)
+
+    region_one = summary.loc[summary["region_id"] == 1].iloc[0]
+    assert region_one["median_object_eccentricity"] == 0.4
+    assert "mean_object_eccentricity" not in summary.columns
+    assert "median_major_axis_length_um" not in summary.columns
+    assert "median_minor_axis_length_um" not in summary.columns
+
+
 def test_atlas_enrichment_converts_kimlab_ids_and_labels_special_rows() -> None:
     summary = pd.DataFrame(
         {

@@ -26,18 +26,18 @@ class PointCloudDataset:
     @classmethod
     def from_files(
         cls,
-        csv_path: Path,
+        table_path: Path,
         json_path: Path,
         *,
         subject_name: str | None = None,
     ) -> "PointCloudDataset":
-        """Load a point-cloud dataset from a CSV and matching metadata JSON."""
+        """Load a point-cloud dataset from Parquet and matching metadata JSON."""
 
-        points = pd.read_csv(csv_path)
+        points = pd.read_parquet(table_path)
         metadata = DatasetMetadata.from_json(json_path)
 
         if subject_name is None:
-            subject_name = _infer_subject_name_from_pointcloud_path(csv_path)
+            subject_name = _infer_subject_name_from_pointcloud_path(table_path)
 
         return cls(
             subject_name=subject_name,
@@ -167,11 +167,11 @@ class VoxelMap:
         }
 
 
-def _infer_subject_name_from_pointcloud_path(csv_path: Path) -> str:
-    """Infer a subject name from a standard point-cloud CSV filename."""
+def _infer_subject_name_from_pointcloud_path(table_path: Path) -> str:
+    """Infer a subject name from a standard point-cloud table filename."""
 
     suffix = "_pointcloud"
-    stem = csv_path.stem
+    stem = table_path.stem
     if stem.endswith(suffix):
         return stem[: -len(suffix)]
     return stem

@@ -13,11 +13,11 @@ from spatialsignal.qc import select_qc_plane_pairs
 def test_deduplicate_across_planes_builds_expected_edges_membership_and_objects() -> None:
     points = pd.DataFrame(
         [
-            {"detection_id": 1, "seg_num": 7, "x": 100, "y": 200, "z": 10, "x_float": 100.0, "y_float": 200.0, "area_px": 20},
-            {"detection_id": 2, "seg_num": 3, "x": 102, "y": 201, "z": 11, "x_float": 102.0, "y_float": 201.0, "area_px": 25},
-            {"detection_id": 3, "seg_num": 5, "x": 101, "y": 199, "z": 12, "x_float": 101.0, "y_float": 199.0, "area_px": 22},
-            {"detection_id": 4, "seg_num": 8, "x": 300, "y": 400, "z": 11, "x_float": 300.0, "y_float": 400.0, "area_px": 18},
-            {"detection_id": 5, "seg_num": 2, "x": 303, "y": 402, "z": 12, "x_float": 303.0, "y_float": 402.0, "area_px": 21},
+            {"detection_id": 1, "seg_num": 7, "x": 100, "y": 200, "z": 10, "x_float": 100.0, "y_float": 200.0, "area_px": 20, "major_axis_length_px": 6.0, "minor_axis_length_px": 4.0, "eccentricity": 0.4},
+            {"detection_id": 2, "seg_num": 3, "x": 102, "y": 201, "z": 11, "x_float": 102.0, "y_float": 201.0, "area_px": 25, "major_axis_length_px": 8.0, "minor_axis_length_px": 5.0, "eccentricity": 0.6},
+            {"detection_id": 3, "seg_num": 5, "x": 101, "y": 199, "z": 12, "x_float": 101.0, "y_float": 199.0, "area_px": 22, "major_axis_length_px": 7.0, "minor_axis_length_px": 4.5, "eccentricity": 0.5},
+            {"detection_id": 4, "seg_num": 8, "x": 300, "y": 400, "z": 11, "x_float": 300.0, "y_float": 400.0, "area_px": 18, "major_axis_length_px": 5.0, "minor_axis_length_px": 3.0, "eccentricity": 0.3},
+            {"detection_id": 5, "seg_num": 2, "x": 303, "y": 402, "z": 12, "x_float": 303.0, "y_float": 402.0, "area_px": 21, "major_axis_length_px": 7.0, "minor_axis_length_px": 4.0, "eccentricity": 0.5},
         ]
     )
 
@@ -106,6 +106,9 @@ def test_deduplicate_across_planes_builds_expected_edges_membership_and_objects(
                 "z_max": 12,
                 "mean_area_px": (20.0 + 25.0 + 22.0) / 3.0,
                 "max_area_px": 25.0,
+                "mean_major_axis_length_px": 7.0,
+                "mean_minor_axis_length_px": 4.5,
+                "mean_eccentricity": 0.5,
             },
             {
                 "object_id": 2,
@@ -121,9 +124,19 @@ def test_deduplicate_across_planes_builds_expected_edges_membership_and_objects(
                 "z_max": 12,
                 "mean_area_px": 19.5,
                 "max_area_px": 21.0,
+                "mean_major_axis_length_px": 6.0,
+                "mean_minor_axis_length_px": 3.5,
+                "mean_eccentricity": 0.4,
             },
         ],
-        columns=CLEANED_OBJECT_REQUIRED_COLUMNS + ["mean_area_px", "max_area_px"],
+        columns=CLEANED_OBJECT_REQUIRED_COLUMNS
+        + [
+            "mean_area_px",
+            "max_area_px",
+            "mean_major_axis_length_px",
+            "mean_minor_axis_length_px",
+            "mean_eccentricity",
+        ],
     )
 
     pd.testing.assert_frame_equal(result.objects.reset_index(drop=True), expected_objects)

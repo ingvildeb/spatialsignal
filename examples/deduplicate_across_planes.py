@@ -23,9 +23,9 @@ def parse_args() -> argparse.Namespace:
         )
     )
     parser.add_argument(
-        "--pointcloud-csv",
+        "--pointcloud-table",
         required=True,
-        help="Path to a raw point-cloud CSV such as {subject}_pointcloud.csv.",
+        help="Path to a raw point-cloud Parquet table such as {subject}_pointcloud.parquet.",
     )
     parser.add_argument(
         "--space-json",
@@ -40,7 +40,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--subject-name",
         default=None,
-        help="Optional subject name override. If omitted, it is inferred from the CSV filename when possible.",
+        help="Optional subject name override. If omitted, it is inferred from the table filename.",
     )
     parser.add_argument(
         "--max-plane-offset",
@@ -105,7 +105,7 @@ def main() -> int:
         raise ValueError(f"--n-qc-pairs must be >= 1, got {args.n_qc_pairs}")
 
     dataset = PointCloudDataset.from_files(
-        csv_path=Path(args.pointcloud_csv),
+        table_path=Path(args.pointcloud_table),
         json_path=Path(args.space_json),
         subject_name=args.subject_name,
     )
@@ -124,7 +124,7 @@ def main() -> int:
         dataset,
         result,
         out_dir,
-        source_name=Path(args.pointcloud_csv).name,
+        source_name=Path(args.pointcloud_table).name,
         parameters={
             "max_plane_offset": args.max_plane_offset,
             "max_xy_distance_um": args.max_xy_distance_um,
@@ -154,11 +154,11 @@ def main() -> int:
     print(f"  cleaned_objects: {len(result.objects)}")
     print(f"  accepted_edges: {len(result.edges)}")
     print(f"  max_n_planes: {args.max_n_planes}")
-    print(f"  objects_csv: {output_paths.objects_csv}")
+    print(f"  objects_table: {output_paths.objects_table}")
     print(f"  objects_space_json: {output_paths.objects_json}")
-    if output_paths.edges_csv is not None:
-        print(f"  edges_csv: {output_paths.edges_csv}")
-    print(f"  object_membership_csv: {output_paths.membership_csv}")
+    if output_paths.edges_table is not None:
+        print(f"  edges_table: {output_paths.edges_table}")
+    print(f"  object_membership_table: {output_paths.membership_table}")
     if qc_summary_path is not None:
         print(f"  pair_qc_summary_json: {qc_summary_path}")
 

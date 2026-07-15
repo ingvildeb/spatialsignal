@@ -1,92 +1,126 @@
-# Workflow
+# Workflows
 
-This document describes the workflows currently supported by `spatialsignal` and the
-boundaries between `spatialsignal` and the rest of the LSFM ecosystem.
+This document describes the workflows currently supported by `spatialsignal`
+and the boundaries between `spatialsignal` and neighboring LSFM packages.
 
-## What spatialsignal does
+## Package Boundary
 
-`spatialsignal` currently supports four core workflow types:
+- `atlasspace` owns registration, transforms, and registration output folders.
+- `atlaslevels` owns atlas hierarchy, region metadata, and ID conversion.
+- `spatialsignal` owns segmentation-derived point tables, voxel maps, and
+  subject-space quantification.
 
-1. Build subject-space centroid point clouds from labeled instance-segmentation masks.
-2. Build subject-space dense signal-point tables from binary semantic masks.
-3. Deduplicate repeated cell-body detections across adjacent planes.
-4. Voxelize subject-space point clouds or semantic masks into subject-aligned analysis grids.
+The canonical interface is the reusable Python code under `src/spatialsignal/`.
+Scripts under `examples/` are thin API demonstrations and testing helpers.
 
-These workflows produce explicit spatial representations together with metadata sidecars that
-make the coordinate system, indexing convention, representation type, and processing provenance
-visible. The canonical starter configs use zero-based `x,y,z` indexing for subject-space outputs.
+## Instance-Segmentation Workflow
 
-The canonical interface is the reusable Python code in `src/spatialsignal/`. The runnable
-`examples/` in the repo are thin wrappers around those APIs and currently serve mainly as practical
-examples and testing helpers.
+Use this workflow when each labeled object in a 2D mask represents a cell body
+or another instance-like detection.
 
-## Supported workflows
+### 1. Build the raw point cloud
 
-### Instance-segmentation workflow
+`build_pointcloud_from_masks()` naturally sorts the mask files, extracts one
+centroid per nonzero label, and writes:
 
-Use this workflow when each labeled object in a 2D mask corresponds to one cell body or other
-instance-like detection.
+- `<subject>_pointcloud.parquet`
+- `<subject>_pointcloud_space.json`
 
-Typical steps:
+The Parquet table contains coordinates, area, major and minor axis lengths,
+and eccentricity for each 2D detection. The JSON sidecar records the spatial
+grid, indexing convention, representation type, and provenance.
 
-1. Build a raw detection point cloud with `examples/build_pointcloud.py`.
-2. Optionally validate the result against the legacy MATLAB centroid CSV.
-3. Deduplicate repeated detections across nearby z planes with `examples/deduplicate_across_planes.py`.
-4. Optionally voxelize the cleaned object table into a subject-aligned count map with `examples/voxelize_pointcloud.py`.
+### 2. Deduplicate detections across planes
 
-Primary outputs:
+`deduplicate_across_planes()` links nearby detections in adjacent planes and
+aggregates them into biological objects. `save_deduplication_outputs()` writes:
 
-- raw detection point cloud CSV + metadata JSON
-- cleaned object table CSV + metadata JSON
-- optional subject-aligned count map outputs
+- `<subject>_objects.parquet`
+- `<subject>_objects_space.json`
+- `<subject>_object_membership.parquet`
+- optional `<subject>_object_edges.parquet`
 
-### Semantic-mask workflow
+The object table preserves native subject-space coordinates. Morphology is
+averaged across the object's contributing 2D detections; these measurements
+describe in-plane segmentation morphology, not reconstructed 3D cell shape.
 
-Use this workflow when the mask represents dense semantic support such as positive signal,
-process masks, or other non-instance binary segmentation outputs.
+### 3. Quantify objects by region
 
-Typical steps:
+The registration integration layer consumes an `atlasspace` output folder and
+loads its subject-space warped annotation and optional brain mask. Object
+coordinates are explicitly remapped from the native mask grid into the
+registration grid before annotation sampling.
 
-1. Build dense signal-support points with `examples/build_signal_points.py` when an explicit
-   point representation is useful.
-2. Or voxelize semantic masks directly into a subject-aligned fraction map with
-   `examples/voxelize_signal_masks.py`.
+The quantification helpers then:
 
-Primary outputs:
+1. assign one region ID to each object
+2. summarize counts, region volume, density, median object area, and median
+   object eccentricity
+3. use `atlaslevels` to add canonical Allen IDs, acronyms, names, and colors
+4. save the per-object assignments as Parquet and the compact region report as
+   CSV
 
-- dense signal-point CSV + metadata JSON
-- subject-aligned fraction map outputs
+The primary outputs are:
 
-### Quality-control and validation workflow
+- `<subject>_objects_with_regions.parquet`
+- `<subject>_objects_with_regions_space.json`
+- `<subject>_region_summary.csv`
 
-The package also provides QC and validation helpers for:
+Subject-space regional summaries are the canonical biological quantitative
+outputs.
+
+### 4. Create a subject-space count map
+
+`voxelize_to_space()` aggregates deduplicated object centroids onto a declared
+subject analysis grid. Count maps are the canonical stored subject-level voxel
+representation. Density maps can be derived from counts and voxel volume when
+needed, but do not need to be stored systematically.
+
+## Semantic-Mask Workflow
+
+Use this workflow when a binary mask represents dense signal support, such as
+positive area or processes, rather than separate biological objects.
+
+The package currently supports:
+
+- `build_signal_points_from_masks()` for explicit signal-support Parquet tables
+- direct voxelization of semantic masks into subject-space fraction maps
+- metadata sidecars for both representations
+
+Atlas-aware per-region semantic summaries are not yet implemented. That future
+workflow should quantify subject-space signal against the warped annotation
+without forcing semantic data into an instance-object model.
+
+## Output Formats
+
+- Large computational tables use Parquet to preserve dtypes and support fast,
+  compressed programmatic access.
+- Compact regional summaries use CSV for straightforward inspection and
+  interchange.
+- Spatial definitions and processing provenance use JSON sidecars.
+- Voxel maps can be saved as NumPy arrays or NIfTI; project workflows may choose
+  a narrower output contract.
+
+## Quality Control and Validation
+
+Available helpers cover:
 
 - centroid image generation
 - pairwise duplicate QC for deduplication
-- MATLAB centroid CSV comparison
-- point-cloud dataset validation against the declared metadata sidecar
+- dataset validation against declared spatial metadata
+- comparison with legacy MATLAB centroid CSV files
 
-## Spatial interpretation
+The MATLAB CSV is a validation and compatibility format, not the canonical
+`spatialsignal` storage format.
 
-The current package is subject-space-first.
+## Reference-Space Outputs
 
-- Subject-space point tables and subject-space region summaries are intended to be the canonical
-  quantitative outputs.
-- Subject-aligned voxel maps are useful for visualization, QC, and later subject-space
-  quantification.
-- Reference-space maps are expected to be useful mainly for visualization and cross-subject
-  comparison, not as the primary biological truth.
+Reference-space maps are planned primarily for aligned visualization and
+cross-subject comparison. The intended instance workflow is to transform
+deduplicated objects into the reference space, voxelize them there, and then
+derive any smoothed or boundary-corrected visualization representation.
 
-A fuller discussion of subject-space quantification versus reference-space aligned maps lives in
-`docs/coordinate_systems.md`.
-
-## Near-term direction
-
-The next major workflow extension is expected to be atlas-aware subject-space quantification:
-
-1. load an `atlasspace` registration output folder
-2. use the warped annotation in subject space
-3. assign objects or voxelized signal to regions
-4. summarize subject-space object counts, region volume, density, and morphology by region
-
-The detailed plan for that work lives in `docs/roadmap.md`.
+An unmodulated aligned point map is not automatically a native-density-preserving
+map after nonlinear deformation. Jacobian-adjusted representations therefore
+remain a separate research lane requiring controlled validation. Canonical
+regional quantification remains in subject space.

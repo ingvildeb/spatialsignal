@@ -46,7 +46,7 @@ def build_pointcloud_from_masks(
         suffix=suffix,
     )
     output_stem = make_subject_output_stem(subject_name)
-    csv_path = out_dir / f"{output_stem}_pointcloud.csv"
+    table_path = out_dir / f"{output_stem}_pointcloud.parquet"
     metadata_path = out_dir / f"{output_stem}_pointcloud_space.json"
 
     if show_progress:
@@ -61,7 +61,7 @@ def build_pointcloud_from_masks(
     )
 
     out_dir.mkdir(parents=True, exist_ok=True)
-    pointcloud.to_csv(csv_path, index=False)
+    pointcloud.to_parquet(table_path, index=False)
     metadata = DatasetMetadata.from_mask_files(
         space_name=space_name,
         orientation=orientation,
@@ -72,7 +72,7 @@ def build_pointcloud_from_masks(
     )
     metadata.to_json(metadata_path)
     if show_progress:
-        print(f"Wrote point cloud CSV to {csv_path}")
+        print(f"Wrote point-cloud table to {table_path}")
         print(f"Wrote point cloud metadata to {metadata_path}")
     if write_qc_images:
         if show_progress:
@@ -118,7 +118,7 @@ def build_signal_points_from_masks(
         suffix=suffix,
     )
     output_stem = make_subject_output_stem(subject_name)
-    csv_path = out_dir / f"{output_stem}_signal_points.csv"
+    table_path = out_dir / f"{output_stem}_signal_points.parquet"
     metadata_path = out_dir / f"{output_stem}_signal_points_space.json"
 
     if show_progress:
@@ -133,7 +133,7 @@ def build_signal_points_from_masks(
     )
 
     out_dir.mkdir(parents=True, exist_ok=True)
-    signal_points.to_csv(csv_path, index=False)
+    signal_points.to_parquet(table_path, index=False)
     metadata = DatasetMetadata.from_mask_files(
         space_name=space_name,
         orientation=orientation,
@@ -144,6 +144,6 @@ def build_signal_points_from_masks(
     )
     metadata.to_json(metadata_path)
     if show_progress:
-        print(f"Wrote signal-points CSV to {csv_path}")
+        print(f"Wrote signal-points table to {table_path}")
         print(f"Wrote signal-points metadata to {metadata_path}")
     return signal_points

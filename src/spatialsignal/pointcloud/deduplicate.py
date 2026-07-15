@@ -234,12 +234,26 @@ def aggregate_cleaned_objects(
         if "area_px" in group.columns:
             row["mean_area_px"] = float(group["area_px"].mean())
             row["max_area_px"] = float(group["area_px"].max())
+        for source_column, output_column in (
+            ("major_axis_length_px", "mean_major_axis_length_px"),
+            ("minor_axis_length_px", "mean_minor_axis_length_px"),
+            ("eccentricity", "mean_eccentricity"),
+        ):
+            if source_column in group.columns:
+                row[output_column] = float(group[source_column].mean())
 
         object_rows.append(row)
 
     objects = pd.DataFrame(object_rows)
     required = CLEANED_OBJECT_REQUIRED_COLUMNS
-    optional = [column for column in ["mean_area_px", "max_area_px"] if column in objects.columns]
+    optional_columns = [
+        "mean_area_px",
+        "max_area_px",
+        "mean_major_axis_length_px",
+        "mean_minor_axis_length_px",
+        "mean_eccentricity",
+    ]
+    optional = [column for column in optional_columns if column in objects.columns]
     return objects[required + optional]
 
 

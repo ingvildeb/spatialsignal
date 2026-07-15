@@ -66,7 +66,7 @@ if __name__ == "__main__":
     )
 
     dataset = PointCloudDataset.from_files(
-        csv_path=OUT_DIR / f"{SUBJECT_NAME}_pointcloud.csv",
+        table_path=OUT_DIR / f"{SUBJECT_NAME}_pointcloud.parquet",
         json_path=OUT_DIR / f"{SUBJECT_NAME}_pointcloud_space.json",
     )
     dataset.validate()
@@ -83,7 +83,7 @@ if __name__ == "__main__":
         dataset,
         result,
         OUT_DIR,
-        source_name=f"{output_stem}_pointcloud.csv",
+        source_name=f"{output_stem}_pointcloud.parquet",
         parameters={
             "max_plane_offset": MAX_PLANE_OFFSET,
             "max_xy_distance_um": MAX_XY_DISTANCE_UM,
@@ -93,7 +93,7 @@ if __name__ == "__main__":
         write_edge_table=True,
     )
     objects_dataset = PointCloudDataset.from_files(
-        dedup_paths.objects_csv,
+        dedup_paths.objects_table,
         dedup_paths.objects_json,
         subject_name=SUBJECT_NAME,
     )
@@ -120,11 +120,11 @@ if __name__ == "__main__":
 
     print(len(result.objects))
     print(count_map.data.shape)
-    print(dedup_paths.objects_csv)
+    print(dedup_paths.objects_table)
     print(dedup_paths.objects_json)
-    print(dedup_paths.membership_csv)
-    if dedup_paths.edges_csv is not None:
-        print(dedup_paths.edges_csv)
+    print(dedup_paths.membership_table)
+    if dedup_paths.edges_table is not None:
+        print(dedup_paths.edges_table)
     print(count_paths.array_path)
     print(count_paths.metadata_path)
     if count_paths.nifti_written:
@@ -142,7 +142,7 @@ if __name__ == "__main__":
         remapped_dataset = remap_pointcloud_dataset_to_space(
             objects_dataset,
             annotation_volume.space,
-            source_name=dedup_paths.objects_csv.name,
+            source_name=dedup_paths.objects_table.name,
             parameters={
                 "registration_dir": str(REGISTRATION_DIR),
                 "annotation_path": str(registration.annotation_path),
@@ -179,7 +179,7 @@ if __name__ == "__main__":
             region_summary,
             remapped_dataset.metadata,
             OUT_DIR,
-            source_name=dedup_paths.objects_csv.name,
+            source_name=dedup_paths.objects_table.name,
             parameters={
                 "registration_dir": str(REGISTRATION_DIR),
                 "annotation_path": str(registration.annotation_path),
@@ -202,6 +202,6 @@ if __name__ == "__main__":
             },
             output_stem=output_stem,
         )
-        print(quant_paths.assigned_objects_csv)
+        print(quant_paths.assigned_objects_table)
         print(quant_paths.assigned_objects_json)
         print(quant_paths.region_summary_csv)

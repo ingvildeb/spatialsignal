@@ -16,8 +16,8 @@ from spatialsignal.quantification import (
     summarize_objects_by_region,
 )
 
-OBJECTS_CSV = Path(
-    r"Z:\LSFM\2026\2026_03\2026_03_16\20260316_10_38_12_NB_101362_F_P14_B6NJ_LAS_488Lectin_561NeuN_640Iba1_4x_4umstep_Destripe_DONE\test_spatialsignal\101362_objects.csv"
+OBJECTS_TABLE = Path(
+    r"Z:\LSFM\2026\2026_03\2026_03_16\20260316_10_38_12_NB_101362_F_P14_B6NJ_LAS_488Lectin_561NeuN_640Iba1_4x_4umstep_Destripe_DONE\test_spatialsignal\101362_objects.parquet"
 )
 SPACE_JSON = Path(
     r"Z:\LSFM\2026\2026_03\2026_03_16\20260316_10_38_12_NB_101362_F_P14_B6NJ_LAS_488Lectin_561NeuN_640Iba1_4x_4umstep_Destripe_DONE\test_spatialsignal\101362_objects_space.json"
@@ -36,11 +36,11 @@ ONTOLOGY_PRESET = "allen_ccfv3"
 REGION_ID_SPACE = "kimlab16bit"
 
 
-def infer_subject_name_from_objects_path(csv_path: Path) -> str:
-    """Infer the subject name from a cleaned object CSV path."""
+def infer_subject_name_from_objects_path(table_path: Path) -> str:
+    """Infer the subject name from a cleaned object table path."""
 
     suffixes = ("_objects", "_pointcloud")
-    stem = csv_path.stem
+    stem = table_path.stem
     for suffix in suffixes:
         if stem.endswith(suffix):
             return stem[: -len(suffix)]
@@ -49,8 +49,8 @@ def infer_subject_name_from_objects_path(csv_path: Path) -> str:
 
 if __name__ == "__main__":
     metadata = DatasetMetadata.from_json(SPACE_JSON)
-    objects = pd.read_csv(OBJECTS_CSV)
-    subject_name = SUBJECT_NAME or infer_subject_name_from_objects_path(OBJECTS_CSV)
+    objects = pd.read_parquet(OBJECTS_TABLE)
+    subject_name = SUBJECT_NAME or infer_subject_name_from_objects_path(OBJECTS_TABLE)
 
     objects_dataset = PointCloudDataset(
         subject_name=subject_name,
@@ -69,7 +69,7 @@ if __name__ == "__main__":
     remapped_dataset = remap_pointcloud_dataset_to_space(
         objects_dataset,
         annotation_volume.space,
-        source_name=OBJECTS_CSV.name,
+        source_name=OBJECTS_TABLE.name,
         parameters={
             "registration_dir": str(REGISTRATION_DIR),
             "annotation_name": ANNOTATION_NAME,
@@ -103,7 +103,7 @@ if __name__ == "__main__":
         region_summary,
         remapped_dataset.metadata,
         OUT_DIR,
-        source_name=OBJECTS_CSV.name,
+        source_name=OBJECTS_TABLE.name,
         parameters={
             "registration_dir": str(REGISTRATION_DIR),
             "annotation_name": ANNOTATION_NAME,
@@ -127,6 +127,6 @@ if __name__ == "__main__":
     print(f"  annotation_path: {registration.annotation_path}")
     if registration.brain_mask_path is not None:
         print(f"  brain_mask_path: {registration.brain_mask_path}")
-    print(f"  assigned_objects_csv: {output_paths.assigned_objects_csv}")
+    print(f"  assigned_objects_table: {output_paths.assigned_objects_table}")
     print(f"  assigned_objects_json: {output_paths.assigned_objects_json}")
     print(f"  region_summary_csv: {output_paths.region_summary_csv}")

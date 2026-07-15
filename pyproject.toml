@@ -16,6 +16,7 @@ dependencies = [
   "atlaslevels>=0.3.0",
   "numpy>=1.26",
   "pandas>=2.2",
+  "pyarrow>=16.0",
   "scipy>=1.13",
   "scikit-image>=0.22",
   "tifffile>=2024.2.12",

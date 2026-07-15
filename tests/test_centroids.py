@@ -53,11 +53,11 @@ def test_extract_centroids_from_mask_returns_expected_zero_based_columns_and_val
                 "y": 0,
                 "z": 1,
                 "area_px": 2,
-                "x_float": 1.5,
-                "y_float": 0.0,
                 "major_axis_length_px": 2.0,
                 "minor_axis_length_px": 0.0,
                 "eccentricity": 1.0,
+                "x_float": 1.5,
+                "y_float": 0.0,
             },
             {
                 "detection_id": 2,
@@ -66,11 +66,11 @@ def test_extract_centroids_from_mask_returns_expected_zero_based_columns_and_val
                 "y": 2,
                 "z": 1,
                 "area_px": 2,
-                "x_float": 0.5,
-                "y_float": 2.0,
                 "major_axis_length_px": 2.0,
                 "minor_axis_length_px": 0.0,
                 "eccentricity": 1.0,
+                "x_float": 0.5,
+                "y_float": 2.0,
             },
         ],
         columns=POINTCLOUD_COLUMNS,
@@ -217,7 +217,7 @@ def test_pointcloud_slice_to_image_supports_one_based_coordinates() -> None:
     np.testing.assert_array_equal(image, expected)
 
 
-def test_build_pointcloud_from_masks_writes_csv_and_space_json(tmp_path: Path) -> None:
+def test_build_pointcloud_from_masks_writes_parquet_and_space_json(tmp_path: Path) -> None:
     mask_dir = tmp_path / "masks"
     out_dir = tmp_path / "out"
     mask_dir.mkdir()
@@ -242,9 +242,9 @@ def test_build_pointcloud_from_masks_writes_csv_and_space_json(tmp_path: Path) -
         max_workers=1,
     )
 
-    assert (out_dir / "Test_Subject_pointcloud.csv").exists()
+    assert (out_dir / "Test_Subject_pointcloud.parquet").exists()
     assert (out_dir / "Test_Subject_pointcloud_space.json").exists()
-    pointcloud = pd.read_csv(out_dir / "Test_Subject_pointcloud.csv")
+    pointcloud = pd.read_parquet(out_dir / "Test_Subject_pointcloud.parquet")
     assert list(pointcloud["detection_id"]) == [1, 2]
     assert list(pointcloud["z"]) == [0, 0]
     with (out_dir / "Test_Subject_pointcloud_space.json").open("r", encoding="utf-8") as handle:
@@ -286,7 +286,7 @@ def test_dataset_metadata_round_trip_json(tmp_path: Path) -> None:
 
 
 def test_pointcloud_dataset_from_files_and_summary(tmp_path: Path) -> None:
-    csv_path = tmp_path / "Test_Subject_pointcloud.csv"
+    table_path = tmp_path / "Test_Subject_pointcloud.parquet"
     json_path = tmp_path / "Test_Subject_pointcloud_space.json"
 
     pd.DataFrame(
@@ -295,7 +295,7 @@ def test_pointcloud_dataset_from_files_and_summary(tmp_path: Path) -> None:
             {"detection_id": 2, "seg_num": 2, "x": 2, "y": 3, "z": 1},
         ],
         columns=POINTCLOUD_REQUIRED_COLUMNS,
-    ).to_csv(csv_path, index=False)
+    ).to_parquet(table_path, index=False)
 
     DatasetMetadata(
         schema_name="spatialsignal.dataset_metadata",
@@ -315,7 +315,7 @@ def test_pointcloud_dataset_from_files_and_summary(tmp_path: Path) -> None:
         ),
     ).to_json(json_path)
 
-    dataset = PointCloudDataset.from_files(csv_path, json_path)
+    dataset = PointCloudDataset.from_files(table_path, json_path)
     dataset.validate()
     summary = dataset.summary()
 
@@ -328,7 +328,7 @@ def test_pointcloud_dataset_from_files_and_summary(tmp_path: Path) -> None:
 
 
 def test_pointcloud_dataset_validate_raises_for_out_of_bounds_points(tmp_path: Path) -> None:
-    csv_path = tmp_path / "Test_Subject_pointcloud.csv"
+    table_path = tmp_path / "Test_Subject_pointcloud.parquet"
     json_path = tmp_path / "Test_Subject_pointcloud_space.json"
 
     pd.DataFrame(
@@ -336,7 +336,7 @@ def test_pointcloud_dataset_validate_raises_for_out_of_bounds_points(tmp_path: P
             {"detection_id": 1, "seg_num": 1, "x": 4, "y": 1, "z": 1},
         ],
         columns=POINTCLOUD_REQUIRED_COLUMNS,
-    ).to_csv(csv_path, index=False)
+    ).to_parquet(table_path, index=False)
 
     DatasetMetadata(
         schema_name="spatialsignal.dataset_metadata",
@@ -356,7 +356,7 @@ def test_pointcloud_dataset_validate_raises_for_out_of_bounds_points(tmp_path: P
         ),
     ).to_json(json_path)
 
-    dataset = PointCloudDataset.from_files(csv_path, json_path)
+    dataset = PointCloudDataset.from_files(table_path, json_path)
 
     try:
         dataset.validate()
@@ -367,7 +367,7 @@ def test_pointcloud_dataset_validate_raises_for_out_of_bounds_points(tmp_path: P
 
 
 def _make_valid_dataset_files(tmp_path: Path) -> tuple[Path, Path]:
-    csv_path = tmp_path / "Test_Subject_pointcloud.csv"
+    table_path = tmp_path / "Test_Subject_pointcloud.parquet"
     json_path = tmp_path / "Test_Subject_pointcloud_space.json"
 
     pd.DataFrame(
@@ -376,7 +376,7 @@ def _make_valid_dataset_files(tmp_path: Path) -> tuple[Path, Path]:
             {"detection_id": 2, "seg_num": 2, "x": 2, "y": 3, "z": 1},
         ],
         columns=POINTCLOUD_REQUIRED_COLUMNS,
-    ).to_csv(csv_path, index=False)
+    ).to_parquet(table_path, index=False)
 
     DatasetMetadata(
         schema_name="spatialsignal.dataset_metadata",
@@ -396,19 +396,19 @@ def _make_valid_dataset_files(tmp_path: Path) -> tuple[Path, Path]:
         ),
     ).to_json(json_path)
 
-    return csv_path, json_path
+    return table_path, json_path
 
 
 def test_dataset_columns_invalid(tmp_path: Path) -> None:
-    csv_path, json_path = _make_valid_dataset_files(tmp_path)
+    table_path, json_path = _make_valid_dataset_files(tmp_path)
 
     pd.DataFrame(
         [
             {"detection_id": 1, "seg_num": 1, "x": 3, "y": 1},
         ]
-    ).to_csv(csv_path, index=False)
+    ).to_parquet(table_path, index=False)
 
-    dataset = PointCloudDataset.from_files(csv_path, json_path)
+    dataset = PointCloudDataset.from_files(table_path, json_path)
 
     try:
         dataset.validate()
@@ -419,7 +419,7 @@ def test_dataset_columns_invalid(tmp_path: Path) -> None:
 
 
 def test_dataset_axis_metadata_invalid(tmp_path: Path) -> None:
-    csv_path, json_path = _make_valid_dataset_files(tmp_path)
+    table_path, json_path = _make_valid_dataset_files(tmp_path)
 
     DatasetMetadata(
         schema_name="spatialsignal.dataset_metadata",
@@ -439,7 +439,7 @@ def test_dataset_axis_metadata_invalid(tmp_path: Path) -> None:
         ),
     ).to_json(json_path)
 
-    dataset = PointCloudDataset.from_files(csv_path, json_path)
+    dataset = PointCloudDataset.from_files(table_path, json_path)
 
     try:
         dataset.validate()
@@ -450,7 +450,7 @@ def test_dataset_axis_metadata_invalid(tmp_path: Path) -> None:
 
 
 def test_dataset_indexing_invalid(tmp_path: Path) -> None:
-    csv_path, json_path = _make_valid_dataset_files(tmp_path)
+    table_path, json_path = _make_valid_dataset_files(tmp_path)
 
     DatasetMetadata(
         schema_name="spatialsignal.dataset_metadata",
@@ -470,7 +470,7 @@ def test_dataset_indexing_invalid(tmp_path: Path) -> None:
         ),
     ).to_json(json_path)
 
-    dataset = PointCloudDataset.from_files(csv_path, json_path)
+    dataset = PointCloudDataset.from_files(table_path, json_path)
 
     try:
         dataset.validate()
@@ -481,16 +481,16 @@ def test_dataset_indexing_invalid(tmp_path: Path) -> None:
 
 
 def test_dataset_bounds_invalid(tmp_path: Path) -> None:
-    csv_path, json_path = _make_valid_dataset_files(tmp_path)
+    table_path, json_path = _make_valid_dataset_files(tmp_path)
 
     pd.DataFrame(
         [
             {"detection_id": 1, "seg_num": 1, "x": 4, "y": 1, "z": 1},
         ],
         columns=POINTCLOUD_REQUIRED_COLUMNS,
-    ).to_csv(csv_path, index=False)
+    ).to_parquet(table_path, index=False)
 
-    dataset = PointCloudDataset.from_files(csv_path, json_path)
+    dataset = PointCloudDataset.from_files(table_path, json_path)
 
     try:
         dataset.validate()

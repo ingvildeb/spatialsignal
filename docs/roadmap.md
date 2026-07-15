@@ -1,86 +1,75 @@
 # Roadmap
 
-This document tracks the near-term development plan for `spatialsignal`.
+This internal document tracks development status and planned work for
+`spatialsignal`. The public package overview lives in the repository README.
 
-It is intentionally more internal and planning-oriented than the public-facing README.
-
-## Current baseline
-
-The current package already supports:
-
-- centroid point-cloud generation from labeled instance masks
-- signal-point generation from binary semantic masks
-- cross-plane deduplication of likely repeated detections
-- subject-aligned voxelization of centroid point clouds into count maps
-- subject-aligned voxelization of semantic masks into fraction maps
-- metadata sidecars, QC outputs, and MATLAB validation helpers
-
-## Key design decisions
-
-The current agreed direction is:
+## Settled Direction
 
 - `atlasspace` owns registration, transforms, and registration output folders.
-- `atlaslevels` owns atlas label hierarchy and region rollups.
-- `spatialsignal` owns segmentation-derived spatial representations and downstream quantification.
-- Canonical quantitative outputs should stay in subject space.
-- Reference-space voxel maps should be treated mainly as visualization and comparison outputs.
-- Jacobian-modulated reference-space maps are a later validated research lane, not a first-pass
-  production output.
+- `atlaslevels` owns atlas hierarchy, region metadata, and ID conversion.
+- `spatialsignal` owns segmentation-derived spatial representations and
+  downstream quantification.
+- Subject-space outputs are the canonical quantitative lane.
+- Reference-space maps are primarily visualization and comparison products.
+- Jacobian-adjusted outputs require explicit validation before becoming a
+  supported production feature.
 
-## Near-term priorities
+## Completed
 
-### 1. Registration output integration
+- Package rename and public-facing documentation structure
+- Zero-based canonical point coordinates with explicit metadata sidecars
+- Instance-mask centroid extraction with configurable filename filtering
+- 2D detection morphology extraction
+- Cross-plane deduplication and object-level morphology aggregation
+- Subject-space count-map voxelization
+- Semantic signal-point extraction and fraction-map voxelization
+- Parquet storage for large computational tables
+- `atlasspace` registration-folder integration
+- Native-mask-grid to registration-grid object remapping
+- Subject-space object-to-region assignment
+- Per-region counts, volumes, densities, area, and eccentricity summaries
+- One-step atlas enrichment through `atlaslevels`
+- Legacy MATLAB validation helpers
+- Project-level SING instance workflow using the reusable package APIs
 
-Add a small integration layer that can consume an `atlasspace` registration output folder and
-expose the pieces needed downstream, especially:
+## Next
 
-- warped annotation in subject space
-- warped brain mask in subject space
-- transform files and summary metadata
-- target-space metadata and provenance
+### 1. Real-data validation and performance evaluation
 
-### 2. Subject-space region quantification for instance data
+- Run the revised Parquet and parallel extraction workflow on full NeuN and
+  Iba1 datasets.
+- Record stage runtimes and identify any remaining dominant bottlenecks.
+- Compare object counts and regional summaries with previously validated data.
+- Spot-check area and eccentricity distributions for biological plausibility.
 
-Build a workflow that:
+### 2. Reference-space visualization for instance data
 
-1. starts from a cleaned object table
-2. samples the warped annotation in subject space
-3. assigns one region ID per object
-4. writes per-object tables plus per-region summaries
+- Consume the transform sequence from an `atlasspace` registration folder.
+- Transform deduplicated subject objects into the selected reference space.
+- Preserve source coordinates and transformation provenance.
+- Voxelize transformed objects into reference-space count maps.
+- Add explicit smoothing and boundary-handling helpers for visualization.
 
-This is expected to be the canonical first-pass quantitative output for cell-body workflows.
+### 3. Subject-space semantic quantification
 
-### 3. Subject-space region quantification for semantic data
+- Define canonical regional metrics for semantic signal.
+- Quantify subject-space fraction or burden maps against warped annotations.
+- Keep semantic outputs separate from instance counts and morphology.
 
-Build a corresponding workflow for dense semantic outputs that summarizes subject-space signal
-against the warped annotation, likely from subject-aligned fraction maps or related derived maps.
+### 4. Hierarchy-aware summaries
 
-### 4. Reference-space visualization outputs
+- Add optional region rollups using `atlaslevels`.
+- Keep leaf-level measurements available and make aggregation rules explicit.
 
-Add explicit support for reference-space visualization products, especially aligned maps built from
-transformed instance points. These should be labeled clearly as aligned reference-space maps rather
-than native-density-preserving maps.
+## Later Research Lanes
 
-### 5. Jacobian-modulated map research lane
+### Jacobian-adjusted maps
 
-Before exposing any Jacobian-modulated outputs, validate:
+Validate transform direction, Jacobian convention, and expected behavior in toy
+examples with known expansion and compression before exposing these maps as a
+standard output.
 
-- transform direction and Jacobian convention
-- whether the intended output is content-preserving or density-preserving
-- expected behavior in toy examples with known expansion/compression
+### Group-level outputs
 
-### 6. Group-level outputs later
-
-Only after the per-subject contract is stable should the package grow group-level summaries,
-cohort aggregation helpers, or hotspot-style analyses.
-
-## Proposed implementation order
-
-1. Documentation and naming cleanup
-2. Registration-folder integration
-3. Subject-space point/object-to-region assignment
-4. Subject-space per-region object count, region volume, density, and morphology summaries
-5. Subject-space semantic summaries
-6. Reference-space visualization outputs
-7. Jacobian prototype lane
-8. Group-level outputs later
+Add cohort summaries, group-average maps, and hotspot-style analyses only after
+the per-subject reference-space and semantic contracts are stable.

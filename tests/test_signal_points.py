@@ -121,7 +121,7 @@ def test_extract_signal_points_from_mask_stack_uses_zero_based_slice_order(
     pd.testing.assert_frame_equal(points.reset_index(drop=True), expected)
 
 
-def test_build_signal_points_from_masks_writes_csv_and_space_json(tmp_path: Path) -> None:
+def test_build_signal_points_from_masks_writes_parquet_and_space_json(tmp_path: Path) -> None:
     mask_dir = tmp_path / "masks"
     out_dir = tmp_path / "out"
     mask_dir.mkdir()
@@ -146,9 +146,9 @@ def test_build_signal_points_from_masks_writes_csv_and_space_json(tmp_path: Path
         max_workers=1,
     )
 
-    assert (out_dir / "Test_Subject_signal_points.csv").exists()
+    assert (out_dir / "Test_Subject_signal_points.parquet").exists()
     assert (out_dir / "Test_Subject_signal_points_space.json").exists()
-    points = pd.read_csv(out_dir / "Test_Subject_signal_points.csv")
+    points = pd.read_parquet(out_dir / "Test_Subject_signal_points.parquet")
     assert list(points["point_id"]) == [1, 2, 3]
     assert list(points["z"]) == [0, 0, 0]
     with (out_dir / "Test_Subject_signal_points_space.json").open(

@@ -25,6 +25,11 @@ canonical `spatialsignal` image-axis convention.
 - `z` = natural-sort slice index
 - `indexing = "zero_based"` by default for new outputs
 
+Canonical computational tables are stored as Parquet with matching JSON
+metadata sidecars. CSV remains appropriate for the legacy comparison input and
+for compact human-readable region summaries, but not for large point and object
+tables.
+
 This is the convention that downstream metadata, validation, voxelization, and future
 quantification features are meant to follow.
 

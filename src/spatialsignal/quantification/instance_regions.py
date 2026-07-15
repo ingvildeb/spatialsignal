@@ -280,6 +280,9 @@ def summarize_objects_by_region(
         if "mean_area_px" in group.columns and object_count > 0:
             object_areas_um2 = group["mean_area_px"].astype(float) * pixel_area_um2
             row["median_object_area_um2"] = float(object_areas_um2.median())
+        if "mean_eccentricity" in group.columns and object_count > 0:
+            eccentricities = group["mean_eccentricity"].astype(float)
+            row["median_object_eccentricity"] = float(eccentricities.median())
 
         rows.append(row)
 

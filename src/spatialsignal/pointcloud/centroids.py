@@ -23,11 +23,11 @@ from spatialsignal.utils.images import read_2d_mask
 POINTCLOUD_REQUIRED_COLUMNS = ["detection_id", "seg_num", "x", "y", "z"]
 POINTCLOUD_OPTIONAL_COLUMNS = [
     "area_px",
-    "x_float",
-    "y_float",
     "major_axis_length_px",
     "minor_axis_length_px",
     "eccentricity",
+    "x_float",
+    "y_float",
 ]
 POINTCLOUD_COLUMNS = POINTCLOUD_REQUIRED_COLUMNS + POINTCLOUD_OPTIONAL_COLUMNS
 
@@ -65,12 +65,6 @@ def extract_centroids_from_mask(
     indexing = validate_indexing(indexing)
 
     mask = read_2d_mask(mask_path)
-    labels = np.unique(mask)
-    labels = labels[labels != 0]
-
-    if labels.size == 0:
-        return pd.DataFrame(columns=POINTCLOUD_COLUMNS)
-
     props = regionprops_table(
         mask,
         properties=(
@@ -82,31 +76,32 @@ def extract_centroids_from_mask(
             "eccentricity",
         ),
     )
-    props_df = pd.DataFrame(props)
+    if len(props["label"]) == 0:
+        return pd.DataFrame(columns=POINTCLOUD_COLUMNS)
+
     offset = coordinate_offset(indexing)
-
-    rows: list[dict[str, int | float]] = []
-    for _, prop_row in props_df.iterrows():
-        y_float = float(prop_row["centroid-0"])
-        x_float = float(prop_row["centroid-1"])
-        rows.append(
-            {
-                "seg_num": int(prop_row["label"]),
-                "detection_id": int(prop_row["label"]),
-                "x": matlab_round(x_float) + offset,
-                "y": matlab_round(y_float) + offset,
-                "z": int(slice_index),
-                "area_px": int(prop_row["area"]),
-                "x_float": x_float + offset,
-                "y_float": y_float + offset,
-                "major_axis_length_px": float(prop_row["major_axis_length"]),
-                "minor_axis_length_px": float(prop_row["minor_axis_length"]),
-                "eccentricity": float(prop_row["eccentricity"]),
-            }
-        )
-
-    pointcloud = pd.DataFrame(rows, columns=POINTCLOUD_COLUMNS)
-    pointcloud["detection_id"] = np.arange(1, len(pointcloud) + 1, dtype=int)
+    x_float = np.asarray(props["centroid-1"], dtype=np.float64)
+    y_float = np.asarray(props["centroid-0"], dtype=np.float64)
+    pointcloud = pd.DataFrame(
+        {
+            "detection_id": np.arange(1, len(x_float) + 1, dtype=np.int64),
+            "seg_num": np.asarray(props["label"], dtype=np.int64),
+            "x": np.floor(x_float + 0.5).astype(np.int64) + offset,
+            "y": np.floor(y_float + 0.5).astype(np.int64) + offset,
+            "z": np.full(len(x_float), int(slice_index), dtype=np.int64),
+            "area_px": np.asarray(props["area"], dtype=np.int64),
+            "major_axis_length_px": np.asarray(
+                props["major_axis_length"], dtype=np.float64
+            ),
+            "minor_axis_length_px": np.asarray(
+                props["minor_axis_length"], dtype=np.float64
+            ),
+            "eccentricity": np.asarray(props["eccentricity"], dtype=np.float64),
+            "x_float": x_float + offset,
+            "y_float": y_float + offset,
+        },
+        columns=POINTCLOUD_COLUMNS,
+    )
     return pointcloud
 
 

@@ -32,9 +32,9 @@ def parse_args() -> argparse.Namespace:
         )
     )
     parser.add_argument(
-        "--objects-csv",
+        "--objects-table",
         required=True,
-        help="Path to a cleaned object CSV such as {subject}_objects.csv.",
+        help="Path to a cleaned object table such as {subject}_objects.parquet.",
     )
     parser.add_argument(
         "--space-json",
@@ -54,7 +54,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--subject-name",
         default=None,
-        help="Optional subject name override. If omitted, inferred from the objects CSV stem.",
+        help="Optional subject name override. If omitted, inferred from the objects table stem.",
     )
     parser.add_argument(
         "--annotation-name",
@@ -89,10 +89,10 @@ def main() -> int:
     """Assign cleaned objects to subject-space regions and write summaries."""
 
     args = parse_args()
-    objects_csv = Path(args.objects_csv)
+    objects_table = Path(args.objects_table)
     metadata = DatasetMetadata.from_json(Path(args.space_json))
-    objects = pd.read_csv(objects_csv)
-    subject_name = args.subject_name or infer_subject_name_from_objects_path(objects_csv)
+    objects = pd.read_parquet(objects_table)
+    subject_name = args.subject_name or infer_subject_name_from_objects_path(objects_table)
 
     objects_dataset = PointCloudDataset(
         subject_name=subject_name,
@@ -111,7 +111,7 @@ def main() -> int:
     remapped_dataset = remap_pointcloud_dataset_to_space(
         objects_dataset,
         annotation_volume.space,
-        source_name=objects_csv.name,
+        source_name=objects_table.name,
         parameters={
             "registration_dir": str(args.registration_dir),
             "annotation_name": args.annotation_name,
@@ -145,7 +145,7 @@ def main() -> int:
         region_summary,
         remapped_dataset.metadata,
         Path(args.out_dir),
-        source_name=objects_csv.name,
+        source_name=objects_table.name,
         parameters={
             "registration_dir": str(args.registration_dir),
             "annotation_name": args.annotation_name,
@@ -170,17 +170,17 @@ def main() -> int:
     print(f"  annotation_path: {registration.annotation_path}")
     if registration.brain_mask_path is not None:
         print(f"  brain_mask_path: {registration.brain_mask_path}")
-    print(f"  assigned_objects_csv: {output_paths.assigned_objects_csv}")
+    print(f"  assigned_objects_table: {output_paths.assigned_objects_table}")
     print(f"  assigned_objects_json: {output_paths.assigned_objects_json}")
     print(f"  region_summary_csv: {output_paths.region_summary_csv}")
     return 0
 
 
-def infer_subject_name_from_objects_path(csv_path: Path) -> str:
-    """Infer the subject name from a cleaned object CSV path."""
+def infer_subject_name_from_objects_path(table_path: Path) -> str:
+    """Infer the subject name from a cleaned object table path."""
 
     suffixes = ("_objects", "_pointcloud")
-    stem = csv_path.stem
+    stem = table_path.stem
     for suffix in suffixes:
         if stem.endswith(suffix):
             return stem[: -len(suffix)]

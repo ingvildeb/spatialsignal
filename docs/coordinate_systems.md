@@ -12,7 +12,7 @@ The canonical point-cloud table uses the following columns:
 
 These coordinates describe image-space positions only. They do not encode anatomical orientation
 inside the table itself. Instead, orientation and resolution are recorded in the metadata JSON
-written alongside the CSV.
+written alongside the Parquet table.
 
 For the current subject-space pipeline:
 
@@ -43,8 +43,8 @@ Slice numbering is defined by naturally sorted mask-file order:
 
 ## Relationship to the Legacy MATLAB CSV
 
-The relationship to the legacy MATLAB workflow of te Kim lab is documented separately in
-`docs/legacy_matlab_relationship.md`.
+The relationship to the legacy MATLAB workflow of the Kim lab is documented in
+the [legacy MATLAB relationship](legacy_matlab_relationship.md).
 
 The short version is:
 
@@ -54,7 +54,7 @@ The short version is:
 
 ## Point-Cloud Metadata
 
-Each point-cloud CSV is accompanied by a nested metadata JSON that separates:
+Each point-cloud Parquet table is accompanied by a nested metadata JSON that separates:
 
 - `space`
   - spatial/grid definition such as `space_name`, `orientation`, `axis_labels`, `indexing`,
@@ -111,19 +111,29 @@ reference-space aligned maps.
 
 Subject-space quantification is intended to be the canonical biological output.
 
-The planned atlas-aware workflow is:
+The implemented atlas-aware instance workflow is:
 
-1. start from subject-space objects or voxel maps
+1. start from deduplicated objects in the native mask grid
 2. consume an `atlasspace` registration output folder
-3. use the warped annotation in subject space
-4. summarize object counts, region volume, density, and object morphology by region
+3. load the warped annotation and optional brain mask in subject space
+4. remap object coordinates into the annotation's registration grid
+5. sample one region ID per object
+6. summarize counts, region volume, density, median area, and median
+   eccentricity by region
 
 This keeps the biological measurements tied to the subject's own tissue geometry.
+The remapping changes sampling grids within the same subject anatomy; it does not
+apply the subject-to-template transform to create reference-space points.
 
 ### Reference-Space Aligned Maps
 
 Reference-space maps are useful for visualization and cross-subject comparison after anatomical
 alignment.
+
+The planned instance strategy is to transform deduplicated subject objects into
+the reference space, retain source coordinates and provenance, voxelize the
+transformed objects on the reference grid, and derive smoothed or
+boundary-corrected visualization maps from that representation.
 
 However, an unmodulated aligned map should not automatically be interpreted as native cell density.
 After nonlinear warping, local expansion or compression can change how many points fall into a

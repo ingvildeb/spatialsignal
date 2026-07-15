@@ -18,6 +18,10 @@ quantification.
 - explicit metadata sidecars describing space, representation, and processing
 - validation against legacy MATLAB centroid CSV outputs
 
+Large computational tables are stored as Parquet to preserve dtypes and support
+efficient programmatic reads. Compact per-region summaries remain CSV for easy
+inspection, and spatial metadata and provenance remain in JSON sidecars.
+
 ## Package scope
 
 `spatialsignal` is intended to work alongside other packages in the LSFM
@@ -52,14 +56,13 @@ A minimal subject-space workflow looks like this:
 ```python
 from pathlib import Path
 
-from spatialsignal.io import save_deduplication_outputs
+from spatialsignal.io import save_deduplication_outputs, save_voxel_map_outputs
 from spatialsignal.pointcloud import (
     PointCloudDataset,
     build_pointcloud_from_masks,
     deduplicate_across_planes,
 )
 from spatialsignal.voxelization import (
-    count_map_to_density_map,
     make_subject_analysis_space,
     voxelize_to_space,
 )
@@ -87,7 +90,7 @@ if __name__ == "__main__":
     )
 
     dataset = PointCloudDataset.from_files(
-        csv_path=OUT_DIR / f"{SUBJECT_NAME}_pointcloud.csv",
+        table_path=OUT_DIR / f"{SUBJECT_NAME}_pointcloud.parquet",
         json_path=OUT_DIR / f"{SUBJECT_NAME}_pointcloud_space.json",
     )
     dataset.validate()
@@ -101,7 +104,7 @@ if __name__ == "__main__":
     )
     dedup_paths = save_deduplication_outputs(dataset, result, OUT_DIR)
     objects = PointCloudDataset.from_files(
-        dedup_paths.objects_csv,
+        dedup_paths.objects_table,
         dedup_paths.objects_json,
         subject_name=SUBJECT_NAME,
     )
@@ -112,11 +115,16 @@ if __name__ == "__main__":
         space_name="subject_analysis_space",
     )
     count_map = voxelize_to_space(objects, analysis_space)
-    density_map = count_map_to_density_map(count_map)
+    count_paths = save_voxel_map_outputs(
+        count_map,
+        OUT_DIR,
+        name_suffix="count_map",
+        formats=("nifti",),
+    )
 
     print(len(result.objects))
     print(count_map.data.shape)
-    print(density_map.metadata.representation.value_units)
+    print(count_paths.nifti_path)
 ```
 
 Use `max_workers=1` in notebooks and other interactive sessions. On Windows, if
@@ -180,13 +188,16 @@ package interface.
 Region-report workflows use `atlaslevels` automatically. Set the annotation ID
 namespace to `allen` or `kimlab16bit`; the saved report retains the annotation's
 original `region_id` and adds the canonical Allen ID, acronym, name, and color.
+See the [workflow guide](docs/workflow.md) and
+[region-quantification example](examples/quantify_objects_by_region.py) for the
+complete registration-folder-to-region-report workflow.
 
 ## Documentation
 
-- `docs/workflow.md`: supported workflows and package boundaries
-- `docs/coordinate_systems.md`: coordinate conventions and map semantics
-- `docs/legacy_matlab_relationship.md`: legacy MATLAB compatibility notes
-- `docs/roadmap.md`: near-term development roadmap
+- [Workflow guide](docs/workflow.md): supported workflows and package boundaries
+- [Coordinate systems](docs/coordinate_systems.md): coordinate conventions and map semantics
+- [Legacy MATLAB relationship](docs/legacy_matlab_relationship.md): compatibility notes
+- [Roadmap](docs/roadmap.md): internal development status and planned work
 
 ## Repository layout
 

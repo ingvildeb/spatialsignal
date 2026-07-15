@@ -39,17 +39,17 @@ class VoxelMapOutputPaths:
 class DeduplicationOutputPaths:
     """Paths written for saved deduplication outputs."""
 
-    objects_csv: Path
+    objects_table: Path
     objects_json: Path
-    membership_csv: Path
-    edges_csv: Path | None
+    membership_table: Path
+    edges_table: Path | None
 
 
 @dataclass(frozen=True)
 class InstanceRegionQuantificationOutputPaths:
     """Paths written for instance region-assignment outputs."""
 
-    assigned_objects_csv: Path
+    assigned_objects_table: Path
     assigned_objects_json: Path
     region_summary_csv: Path
 
@@ -148,13 +148,15 @@ def save_deduplication_outputs(
     if output_stem is None:
         output_stem = make_subject_output_stem(dataset.subject_name)
     if source_name is None:
-        source_name = f"{output_stem}_pointcloud.csv"
+        source_name = f"{output_stem}_pointcloud.parquet"
 
     out_dir.mkdir(parents=True, exist_ok=True)
-    objects_csv = out_dir / f"{output_stem}_objects.csv"
+    objects_table = out_dir / f"{output_stem}_objects.parquet"
     objects_json = out_dir / f"{output_stem}_objects_space.json"
-    membership_csv = out_dir / f"{output_stem}_object_membership.csv"
-    edges_csv = out_dir / f"{output_stem}_object_edges.csv" if write_edge_table else None
+    membership_table = out_dir / f"{output_stem}_object_membership.parquet"
+    edges_table = (
+        out_dir / f"{output_stem}_object_edges.parquet" if write_edge_table else None
+    )
 
     processing_metadata = ProcessingProvenance(
         stage="deduplicate_across_planes",
@@ -171,17 +173,17 @@ def save_deduplication_outputs(
         processing=processing_metadata,
     )
 
-    result.objects.to_csv(objects_csv, index=False)
+    result.objects.to_parquet(objects_table, index=False)
     objects_metadata.to_json(objects_json)
-    result.membership.to_csv(membership_csv, index=False)
-    if edges_csv is not None:
-        result.edges.to_csv(edges_csv, index=False)
+    result.membership.to_parquet(membership_table, index=False)
+    if edges_table is not None:
+        result.edges.to_parquet(edges_table, index=False)
 
     return DeduplicationOutputPaths(
-        objects_csv=objects_csv,
+        objects_table=objects_table,
         objects_json=objects_json,
-        membership_csv=membership_csv,
-        edges_csv=edges_csv,
+        membership_table=membership_table,
+        edges_table=edges_table,
     )
 
 
@@ -197,12 +199,12 @@ def save_instance_region_quantification_outputs(
 ) -> InstanceRegionQuantificationOutputPaths:
     """Save region-assigned object tables and per-region summaries."""
 
-    subject_name = source_name.removesuffix("_objects.csv").removesuffix(".csv")
+    subject_name = source_name.removesuffix("_objects.parquet").removesuffix(".parquet")
     if output_stem is None:
         output_stem = make_subject_output_stem(subject_name)
 
     out_dir.mkdir(parents=True, exist_ok=True)
-    assigned_objects_csv = out_dir / f"{output_stem}_objects_with_regions.csv"
+    assigned_objects_table = out_dir / f"{output_stem}_objects_with_regions.parquet"
     assigned_objects_json = out_dir / f"{output_stem}_objects_with_regions_space.json"
     region_summary_csv = out_dir / f"{output_stem}_region_summary.csv"
 
@@ -228,12 +230,12 @@ def save_instance_region_quantification_outputs(
         processing=processing_metadata,
     )
 
-    assigned_objects.to_csv(assigned_objects_csv, index=False)
+    assigned_objects.to_parquet(assigned_objects_table, index=False)
     assigned_metadata.to_json(assigned_objects_json)
     region_summary.to_csv(region_summary_csv, index=False)
 
     return InstanceRegionQuantificationOutputPaths(
-        assigned_objects_csv=assigned_objects_csv,
+        assigned_objects_table=assigned_objects_table,
         assigned_objects_json=assigned_objects_json,
         region_summary_csv=region_summary_csv,
     )
