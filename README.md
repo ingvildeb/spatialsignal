@@ -1,11 +1,11 @@
 # spatialsignal
 
-`spatialsignal` is a reusable Python package for segmentation-derived spatial
-representations from light-sheet fluorescence microscopy workflows.
+`spatialsignal` is a reusable Python package for deriving and analysing spatial
+representations from instance or semantic segmentations from light-sheet fluorescence microscopy workflows.
 
 The package is designed as the downstream quantification layer in the LSFM
 ecosystem. It focuses on building validated subject-space point clouds and
-voxel maps, writing explicit spatial metadata, and supporting later atlas-aware
+voxel maps, writing explicit spatial metadata, and atlas-aware
 quantification.
 
 `spatialsignal` currently supports:
@@ -14,13 +14,13 @@ quantification.
 - dense signal-support point tables from binary semantic masks
 - cross-plane deduplication of repeated detections
 - subject-space voxelization into count maps and fraction maps
-- subject-space object-to-region assignment with atlas names, counts, densities, and morphology
+- subject-space object-to-region assignment with atlas names, counts, densities, and 2D morphology measurements
 - explicit metadata sidecars describing space, representation, and processing
-- validation against legacy MATLAB centroid CSV outputs
+- validation against legacy MATLAB centroid CSV outputs (relevant for Kim lab members)
 
-Large computational tables are stored as Parquet to preserve dtypes and support
+Large tables are stored as Parquet to preserve dtypes and support
 efficient programmatic reads. Compact per-region summaries remain CSV for easy
-inspection, and spatial metadata and provenance remain in JSON sidecars.
+inspection and non-programmatic use. Spatial metadata and provenance are stored in JSON sidecars.
 
 ## Package scope
 
