@@ -38,6 +38,14 @@ CLEANED_OBJECT_REQUIRED_COLUMNS = [
     "z_max",
 ]
 
+_OPTIONAL_OBJECT_AGGREGATIONS = {
+    "mean_area_px": ("area_px", "mean"),
+    "max_area_px": ("area_px", "max"),
+    "mean_major_axis_length_px": ("major_axis_length_px", "mean"),
+    "mean_minor_axis_length_px": ("minor_axis_length_px", "mean"),
+    "mean_eccentricity": ("eccentricity", "mean"),
+}
+
 
 @dataclass(frozen=True)
 class DeduplicationResult:
@@ -206,55 +214,73 @@ def aggregate_cleaned_objects(
     points: pd.DataFrame,
     membership: pd.DataFrame,
 ) -> pd.DataFrame:
-    """Aggregate raw detections into cleaned cross-plane objects."""
+    """Aggregate raw detections into cleaned objects with grouped reductions."""
 
-    merged = membership.merge(points, on="detection_id", how="left", validate="many_to_one")
+    merged = membership.merge(
+        points,
+        on="detection_id",
+        how="left",
+        validate="many_to_one",
+        sort=False,
+    )
+    if "seg_num" in merged.columns and merged["seg_num"].isna().any():
+        raise ValueError("Membership contains detection IDs absent from the point cloud")
+
     x_coord, y_coord = _xy_coordinate_columns(points)
+    aggregations: dict[str, tuple[str, str]] = {
+        "x_float": (x_coord, "mean"),
+        "y_float": (y_coord, "mean"),
+        "z_float": ("z", "mean"),
+        "n_detections": ("detection_id", "size"),
+        "n_planes": ("z", "nunique"),
+        "z_min": ("z", "min"),
+        "z_max": ("z", "max"),
+    }
+    for output_column, (source_column, reducer) in _OPTIONAL_OBJECT_AGGREGATIONS.items():
+        if source_column in points.columns:
+            aggregations[output_column] = (source_column, reducer)
 
-    object_rows: list[dict[str, int | float]] = []
-    for object_id, group in merged.groupby("object_id", sort=True):
-        x_float = float(group[x_coord].mean())
-        y_float = float(group[y_coord].mean())
-        z_float = float(group["z"].mean())
+    membership_is_sorted = membership["object_id"].is_monotonic_increasing
+    objects = (
+        merged.groupby(
+            "object_id",
+            sort=not membership_is_sorted,
+            observed=True,
+        )
+        .agg(**aggregations)
+        .reset_index()
+    )
+    objects["x"] = np.floor(objects["x_float"] + 0.5).astype(np.int64)
+    objects["y"] = np.floor(objects["y_float"] + 0.5).astype(np.int64)
+    objects["z"] = np.floor(objects["z_float"] + 0.5).astype(np.int64)
 
-        row: dict[str, int | float] = {
-            "object_id": int(object_id),
-            "x": int(np.floor(x_float + 0.5)),
-            "y": int(np.floor(y_float + 0.5)),
-            "z": int(np.floor(z_float + 0.5)),
-            "x_float": x_float,
-            "y_float": y_float,
-            "z_float": z_float,
-            "n_detections": int(len(group)),
-            "n_planes": int(group["z"].nunique()),
-            "z_min": int(group["z"].min()),
-            "z_max": int(group["z"].max()),
-        }
-
-        if "area_px" in group.columns:
-            row["mean_area_px"] = float(group["area_px"].mean())
-            row["max_area_px"] = float(group["area_px"].max())
-        for source_column, output_column in (
-            ("major_axis_length_px", "mean_major_axis_length_px"),
-            ("minor_axis_length_px", "mean_minor_axis_length_px"),
-            ("eccentricity", "mean_eccentricity"),
-        ):
-            if source_column in group.columns:
-                row[output_column] = float(group[source_column].mean())
-
-        object_rows.append(row)
-
-    objects = pd.DataFrame(object_rows)
-    required = CLEANED_OBJECT_REQUIRED_COLUMNS
-    optional_columns = [
-        "mean_area_px",
-        "max_area_px",
-        "mean_major_axis_length_px",
-        "mean_minor_axis_length_px",
-        "mean_eccentricity",
+    integer_columns = [
+        "object_id",
+        "x",
+        "y",
+        "z",
+        "n_detections",
+        "n_planes",
+        "z_min",
+        "z_max",
     ]
-    optional = [column for column in optional_columns if column in objects.columns]
-    return objects[required + optional]
+    objects[integer_columns] = objects[integer_columns].astype(np.int64)
+    float_columns = [
+        column
+        for column in (
+            "x_float",
+            "y_float",
+            "z_float",
+            *_OPTIONAL_OBJECT_AGGREGATIONS,
+        )
+        if column in objects.columns
+    ]
+    objects[float_columns] = objects[float_columns].astype(np.float64)
+
+    optional = [
+        column for column in _OPTIONAL_OBJECT_AGGREGATIONS if column in objects.columns
+    ]
+    return objects[CLEANED_OBJECT_REQUIRED_COLUMNS + optional]
 
 
 def _xy_coordinate_columns(points: pd.DataFrame) -> tuple[str, str]:

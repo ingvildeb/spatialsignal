@@ -21,6 +21,7 @@ This internal document tracks development status and planned work for
 - Instance-mask centroid extraction with configurable filename filtering
 - 2D detection morphology extraction
 - Cross-plane deduplication and object-level morphology aggregation
+- Vectorized object aggregation validated on 31.6 million detections
 - Subject-space count-map voxelization
 - Semantic signal-point extraction and fraction-map voxelization
 - Parquet storage for large computational tables

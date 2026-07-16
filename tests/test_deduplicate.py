@@ -1,9 +1,11 @@
 import pandas as pd
+import pytest
 
 from spatialsignal.pointcloud import (
     CLEANED_OBJECT_REQUIRED_COLUMNS,
     SpaceDefinition,
     EDGE_COLUMNS,
+    aggregate_cleaned_objects,
     deduplicate_across_planes,
     summarize_deduplication_result,
 )
@@ -170,6 +172,39 @@ def test_deduplicate_across_planes_falls_back_to_integer_coordinates_when_float_
     assert len(result.edges) == 1
     assert len(result.objects) == 1
     assert result.objects.loc[0, "x_float"] == 10.5
+
+
+def test_aggregate_cleaned_objects_sorts_unsorted_membership() -> None:
+    points = pd.DataFrame(
+        [
+            {"detection_id": 1, "seg_num": 1, "x": 10, "y": 20, "z": 1},
+            {"detection_id": 2, "seg_num": 2, "x": 12, "y": 22, "z": 2},
+            {"detection_id": 3, "seg_num": 3, "x": 30, "y": 40, "z": 3},
+        ]
+    )
+    membership = pd.DataFrame(
+        [
+            {"object_id": 2, "detection_id": 3},
+            {"object_id": 1, "detection_id": 2},
+            {"object_id": 1, "detection_id": 1},
+        ]
+    )
+
+    objects = aggregate_cleaned_objects(points, membership)
+
+    assert list(objects["object_id"]) == [1, 2]
+    assert list(objects["x_float"]) == [11.0, 30.0]
+    assert list(objects["n_detections"]) == [2, 1]
+
+
+def test_aggregate_cleaned_objects_rejects_unknown_detection_ids() -> None:
+    points = pd.DataFrame(
+        [{"detection_id": 1, "seg_num": 1, "x": 10, "y": 20, "z": 1}]
+    )
+    membership = pd.DataFrame([{"object_id": 1, "detection_id": 999}])
+
+    with pytest.raises(ValueError, match="absent from the point cloud"):
+        aggregate_cleaned_objects(points, membership)
 
 
 def test_deduplicate_across_planes_max_n_planes_cap_blocks_three_plane_chain() -> None:
