@@ -15,6 +15,7 @@ quantification.
 - cross-plane deduplication of repeated detections
 - subject-space voxelization into count maps and fraction maps
 - subject-space object-to-region assignment with atlas names, counts, densities, and 2D morphology measurements
+- optional hierarchy-level instance summaries using curated `atlaslevels` bundles
 - explicit metadata sidecars describing space, representation, and processing
 - validation against legacy MATLAB centroid CSV outputs (relevant for Kim lab members)
 

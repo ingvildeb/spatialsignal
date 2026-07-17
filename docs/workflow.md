@@ -69,6 +69,31 @@ The primary outputs are:
 Subject-space regional summaries are the canonical biological quantitative
 outputs.
 
+### Optional hierarchy-level summaries
+
+`summarize_objects_by_hierarchy_level()` produces an additional report at one
+curated `atlaslevels` hierarchy level. The caller explicitly selects the
+hierarchy preset and level for each invocation. The function maps source IDs
+to canonical Allen hierarchy parents, aggregates annotation volumes and
+object counts, recomputes density, and calculates morphology medians directly
+from all underlying objects assigned to each parent.
+
+Observed parent-region labels are preserved as explicit residual rows when a
+selected hierarchy level splits that parent's descendants more finely. The
+annotation is authoritative here, so an observed ancestor is retained even if
+the packaged atlas metadata does not predict direct voxel support for it. This
+ensures that hierarchy reports retain every labeled annotation voxel.
+
+Hierarchy reports mark these residual-only rows with
+`is_parent_residual = True`. The report's `region_id` is already the canonical
+Allen ID after hierarchy mapping, so it does not duplicate that value in an
+`allen_region_id` column. The selected level and source ID namespace remain
+invocation settings rather than repeated columns in every CSV row.
+
+The detailed report remains the canonical base result. Child-region densities
+are never averaged, and child-region medians are never combined to approximate
+parent morphology.
+
 ### 4. Create a subject-space count map
 
 `voxelize_to_space()` aggregates deduplicated object centroids onto a declared

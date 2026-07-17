@@ -30,6 +30,7 @@ This internal document tracks development status and planned work for
 - Subject-space object-to-region assignment
 - Per-region counts, volumes, densities, area, and eccentricity summaries
 - One-step atlas enrichment through `atlaslevels`
+- Optional hierarchy-level instance summaries through curated `atlaslevels` bundles
 - Legacy MATLAB validation helpers
 - Project-level SING instance workflow using the reusable package APIs
 
@@ -56,11 +57,6 @@ This internal document tracks development status and planned work for
 - Define canonical regional metrics for semantic signal.
 - Quantify subject-space fraction or burden maps against warped annotations.
 - Keep semantic outputs separate from instance counts and morphology.
-
-### 4. Hierarchy-aware summaries
-
-- Add optional region rollups using `atlaslevels`.
-- Keep leaf-level measurements available and make aggregation rules explicit.
 
 ## Later Research Lanes
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import replace
 from typing import Any
 
@@ -242,23 +243,58 @@ def summarize_objects_by_region(
     _validate_volume_shape(annotation_data, volume_space, volume_name="annotation")
 
     voxel_volume_um3 = float(np.prod(volume_space.resolution_um))
-    region_ids, region_voxels = np.unique(
-        annotation_data.astype(np.int64, copy=False),
-        return_counts=True,
-    )
-    grouped = assigned_objects.groupby(region_column, sort=True)
+    region_ids, region_voxels = np.unique(annotation_data, return_counts=True)
     area_space = area_measurement_space if area_measurement_space is not None else object_space
-    pixel_area_um2 = _in_plane_pixel_area_um2(area_space)
+    region_voxel_counts = {
+        int(region_id): int(voxel_count)
+        for region_id, voxel_count in zip(region_ids, region_voxels, strict=True)
+    }
+    return _summarize_objects_from_region_counts(
+        assigned_objects,
+        assigned_objects[region_column],
+        region_voxel_counts,
+        volume_space=volume_space,
+        area_measurement_space=area_space,
+        background_id=background_id,
+        out_of_bounds_id=out_of_bounds_id,
+        include_background=include_background,
+        include_out_of_bounds=include_out_of_bounds,
+    )
+
+
+def _summarize_objects_from_region_counts(
+    assigned_objects: pd.DataFrame,
+    grouped_region_ids: pd.Series,
+    region_voxel_counts: Mapping[int, int],
+    *,
+    volume_space: SpaceDefinition,
+    area_measurement_space: SpaceDefinition,
+    background_id: int,
+    out_of_bounds_id: int,
+    include_background: bool,
+    include_out_of_bounds: bool,
+) -> pd.DataFrame:
+    """Build one region report from object groups and precomputed voxel counts."""
+
+    if len(grouped_region_ids) != len(assigned_objects):
+        raise ValueError("Grouped region IDs must contain one value per assigned object")
+    if grouped_region_ids.isna().any():
+        raise ValueError("Grouped region IDs contain missing values")
+
+    grouped = assigned_objects.groupby(grouped_region_ids, sort=True)
+    voxel_volume_um3 = float(np.prod(volume_space.resolution_um))
+    pixel_area_um2 = _in_plane_pixel_area_um2(area_measurement_space)
 
     rows: list[dict[str, Any]] = []
-    for region_id, voxel_count in zip(region_ids, region_voxels, strict=True):
+    for region_id, voxel_count in sorted(region_voxel_counts.items()):
         region_id = int(region_id)
         if region_id == background_id and not include_background:
             continue
 
+        group_positions = grouped.indices.get(region_id)
         group = (
-            grouped.get_group(region_id)
-            if region_id in grouped.groups
+            assigned_objects.iloc[group_positions]
+            if group_positions is not None
             else assigned_objects.iloc[0:0]
         )
         volume_um3 = float(voxel_count) * voxel_volume_um3
@@ -287,7 +323,7 @@ def summarize_objects_by_region(
         rows.append(row)
 
     if include_out_of_bounds:
-        out_of_bounds = assigned_objects.loc[assigned_objects[region_column] == out_of_bounds_id]
+        out_of_bounds = assigned_objects.loc[grouped_region_ids == out_of_bounds_id]
         if not out_of_bounds.empty:
             row = {
                 "region_id": int(out_of_bounds_id),
