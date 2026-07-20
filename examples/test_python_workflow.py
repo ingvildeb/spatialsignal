@@ -9,19 +9,13 @@ from spatialsignal.io import (
 from spatialsignal.integration import (
     load_atlasspace_registration_folder,
     load_registration_annotation_volume,
-    load_registration_brain_mask_volume,
 )
 from spatialsignal.models import PointCloudDataset
 from spatialsignal.pointcloud import (
     build_pointcloud_from_masks,
     deduplicate_across_planes,
 )
-from spatialsignal.quantification import (
-    assign_objects_to_regions,
-    enrich_region_summary_with_atlas,
-    remap_pointcloud_dataset_to_space,
-    summarize_objects_by_region,
-)
+from spatialsignal.quantification import quantify_objects_by_region
 from spatialsignal.voxelization import (
     count_map_to_density_map,
     make_subject_analysis_space,
@@ -137,57 +131,23 @@ if __name__ == "__main__":
     if REGISTRATION_DIR is not None:
         registration = load_atlasspace_registration_folder(REGISTRATION_DIR)
         annotation_volume = load_registration_annotation_volume(registration)
-        brain_mask_volume = load_registration_brain_mask_volume(registration)
-
-        remapped_dataset = remap_pointcloud_dataset_to_space(
+        quantification_result = quantify_objects_by_region(
             objects_dataset,
-            annotation_volume.space,
-            source_name=dedup_paths.objects_table.name,
-            parameters={
-                "registration_dir": str(REGISTRATION_DIR),
-                "annotation_path": str(registration.annotation_path),
-                "brain_mask_path": (
-                    str(registration.brain_mask_path)
-                    if registration.brain_mask_path is not None
-                    else None
-                ),
-            },
-        )
-
-        assigned_objects = assign_objects_to_regions(
-            remapped_dataset.points,
-            remapped_dataset.space,
-            annotation_volume.data,
-            annotation_space=annotation_volume.space,
-            brain_mask_data=(brain_mask_volume.data if brain_mask_volume is not None else None),
-        )
-        region_summary = summarize_objects_by_region(
-            assigned_objects,
-            remapped_dataset.space,
-            annotation_volume.data,
-            annotation_space=annotation_volume.space,
-            area_measurement_space=objects_dataset.space,
-            include_background=INCLUDE_BACKGROUND_REGION,
-        )
-        region_summary = enrich_region_summary_with_atlas(
-            region_summary,
+            annotation_volume,
             ontology_preset=ONTOLOGY_PRESET,
             region_id_space=REGION_ID_SPACE,
+            include_background=INCLUDE_BACKGROUND_REGION,
         )
         quant_paths = save_instance_region_quantification_outputs(
-            assigned_objects,
-            region_summary,
-            remapped_dataset.metadata,
+            quantification_result.assigned_objects,
+            quantification_result.region_summary,
+            quantification_result.remapped_objects.metadata,
             OUT_DIR,
             source_name=dedup_paths.objects_table.name,
+            annotation=annotation_volume,
             parameters={
                 "registration_dir": str(REGISTRATION_DIR),
                 "annotation_path": str(registration.annotation_path),
-                "brain_mask_path": (
-                    str(registration.brain_mask_path)
-                    if registration.brain_mask_path is not None
-                    else None
-                ),
                 "include_background_region": INCLUDE_BACKGROUND_REGION,
                 "ontology_preset": ONTOLOGY_PRESET,
                 "region_id_space": REGION_ID_SPACE,
@@ -205,3 +165,4 @@ if __name__ == "__main__":
         print(quant_paths.assigned_objects_table)
         print(quant_paths.assigned_objects_json)
         print(quant_paths.region_summary_csv)
+        print(quant_paths.qc_png)

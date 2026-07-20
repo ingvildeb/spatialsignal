@@ -127,18 +127,38 @@ def load_registration_brain_mask_volume(
 def load_label_volume(
     path: Path,
     *,
-    space_name: str,
+    space_name: str | None = None,
     indexing: str = "zero_based",
 ) -> LabelVolume:
-    """Load a NIfTI volume and derive a `SpaceDefinition` from its affine and shape."""
+    """Load a NIfTI label volume and derive its spatial grid from the image.
 
+    ``space_name`` is an optional provenance label. When omitted, it is inferred
+    from the NIfTI filename without the ``.nii`` or ``.nii.gz`` suffix.
+    """
+
+    path = Path(path)
     image = nib.load(str(path))
     data = np.asarray(image.dataobj)
     if data.ndim != 3:
         raise ValueError(f"Expected a 3D label volume at {path}, got shape {data.shape}")
 
-    space = _space_from_nifti_image(image, data.shape, space_name=space_name, indexing=indexing)
-    return LabelVolume(path=Path(path), data=data, space=space)
+    resolved_space_name = space_name if space_name is not None else _nifti_stem(path)
+    space = _space_from_nifti_image(
+        image,
+        data.shape,
+        space_name=resolved_space_name,
+        indexing=indexing,
+    )
+    return LabelVolume(path=path, data=data, space=space)
+
+
+def _nifti_stem(path: Path) -> str:
+    """Return a filename without a single or compressed NIfTI suffix."""
+
+    name = path.name
+    if name.lower().endswith(".nii.gz"):
+        return name[:-7]
+    return path.stem
 
 
 def _parse_registration_summary(summary_path: Path) -> dict[str, Any]:

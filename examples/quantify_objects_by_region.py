@@ -11,15 +11,9 @@ from spatialsignal.io import save_instance_region_quantification_outputs
 from spatialsignal.integration import (
     load_atlasspace_registration_folder,
     load_registration_annotation_volume,
-    load_registration_brain_mask_volume,
 )
 from spatialsignal.models import DatasetMetadata, PointCloudDataset
-from spatialsignal.quantification import (
-    assign_objects_to_regions,
-    enrich_region_summary_with_atlas,
-    remap_pointcloud_dataset_to_space,
-    summarize_objects_by_region,
-)
+from spatialsignal.quantification import quantify_objects_by_region
 
 
 def parse_args() -> argparse.Namespace:
@@ -62,11 +56,6 @@ def parse_args() -> argparse.Namespace:
         help="Transformed segmentation name to use as the annotation volume.",
     )
     parser.add_argument(
-        "--brain-mask-name",
-        default="brain_mask",
-        help="Optional transformed segmentation name to use as the brain mask.",
-    )
-    parser.add_argument(
         "--include-background",
         action="store_true",
         help="Include annotation label 0 in the per-region summary output.",
@@ -104,52 +93,26 @@ def main() -> int:
     registration = load_atlasspace_registration_folder(
         Path(args.registration_dir),
         annotation_name=args.annotation_name,
-        brain_mask_name=args.brain_mask_name,
     )
     annotation_volume = load_registration_annotation_volume(registration)
-    brain_mask_volume = load_registration_brain_mask_volume(registration)
-    remapped_dataset = remap_pointcloud_dataset_to_space(
+    result = quantify_objects_by_region(
         objects_dataset,
-        annotation_volume.space,
-        source_name=objects_table.name,
-        parameters={
-            "registration_dir": str(args.registration_dir),
-            "annotation_name": args.annotation_name,
-            "brain_mask_name": args.brain_mask_name,
-        },
-    )
-
-    assigned_objects = assign_objects_to_regions(
-        remapped_dataset.points,
-        remapped_dataset.space,
-        annotation_volume.data,
-        annotation_space=annotation_volume.space,
-        brain_mask_data=(brain_mask_volume.data if brain_mask_volume is not None else None),
-    )
-    region_summary = summarize_objects_by_region(
-        assigned_objects,
-        remapped_dataset.space,
-        annotation_volume.data,
-        annotation_space=annotation_volume.space,
-        area_measurement_space=objects_dataset.space,
-        include_background=args.include_background,
-    )
-    region_summary = enrich_region_summary_with_atlas(
-        region_summary,
+        annotation_volume,
         ontology_preset=args.ontology_preset,
         region_id_space=args.region_id_space,
+        include_background=args.include_background,
     )
 
     output_paths = save_instance_region_quantification_outputs(
-        assigned_objects,
-        region_summary,
-        remapped_dataset.metadata,
+        result.assigned_objects,
+        result.region_summary,
+        result.remapped_objects.metadata,
         Path(args.out_dir),
         source_name=objects_table.name,
+        annotation=annotation_volume,
         parameters={
             "registration_dir": str(args.registration_dir),
             "annotation_name": args.annotation_name,
-            "brain_mask_name": args.brain_mask_name,
             "include_background": args.include_background,
             "ontology_preset": args.ontology_preset,
             "region_id_space": args.region_id_space,
@@ -168,11 +131,10 @@ def main() -> int:
     print(f"  subject_name: {subject_name}")
     print(f"  registration_dir: {args.registration_dir}")
     print(f"  annotation_path: {registration.annotation_path}")
-    if registration.brain_mask_path is not None:
-        print(f"  brain_mask_path: {registration.brain_mask_path}")
     print(f"  assigned_objects_table: {output_paths.assigned_objects_table}")
     print(f"  assigned_objects_json: {output_paths.assigned_objects_json}")
     print(f"  region_summary_csv: {output_paths.region_summary_csv}")
+    print(f"  quantification_qc_png: {output_paths.qc_png}")
     return 0
 
 

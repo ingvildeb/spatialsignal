@@ -2,8 +2,10 @@
 
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
+from spatialsignal.integration import LabelVolume
 from spatialsignal.io import (
     save_deduplication_outputs,
     save_instance_region_quantification_outputs,
@@ -112,9 +114,16 @@ def test_region_assignments_use_parquet_and_summary_remains_csv(tmp_path: Path) 
         _metadata(),
         tmp_path,
         source_name="subject_1_objects.parquet",
+        annotation=LabelVolume(
+            path=tmp_path / "annotation.nii.gz",
+            data=np.zeros(_metadata().space.shape, dtype=np.uint16),
+            space=_metadata().space,
+        ),
     )
 
     assert paths.assigned_objects_table.suffix == ".parquet"
     assert paths.region_summary_csv.suffix == ".csv"
+    assert paths.qc_png is not None
+    assert paths.qc_png.is_file()
     pd.testing.assert_frame_equal(pd.read_parquet(paths.assigned_objects_table), assigned)
     pd.testing.assert_frame_equal(pd.read_csv(paths.region_summary_csv), summary)

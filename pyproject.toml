@@ -21,6 +21,7 @@ dependencies = [
   "scikit-image>=0.22",
   "tifffile>=2024.2.12",
   "imagecodecs>=2024.1.1",
+  "matplotlib>=3.8",
   "natsort>=8.4",
   "nibabel>=5.2",
   "tomli>=2.0.1; python_version < '3.11'",

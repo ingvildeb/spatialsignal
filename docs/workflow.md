@@ -47,24 +47,33 @@ describe in-plane segmentation morphology, not reconstructed 3D cell shape.
 ### 3. Quantify objects by region
 
 The registration integration layer consumes an `atlasspace` output folder and
-loads its subject-space warped annotation and optional brain mask. Object
-coordinates are explicitly remapped from the native mask grid into the
-registration grid before annotation sampling.
+loads its subject-space warped annotation. A separate brain mask is not needed
+for region quantification: annotation background is excluded from the report by
+default, while out-of-bounds objects remain available as a QC row.
 
-The quantification helpers then:
+`quantify_objects_by_region()` then:
 
-1. assign one region ID to each object
-2. summarize counts, region volume, density, median object area, and median
+1. remaps cleaned-object coordinates from the native mask grid into the
+   annotation grid
+2. assigns one region ID to each object
+3. summarizes counts, region volume, density, median object area, and median
    object eccentricity
-3. use `atlaslevels` to add canonical Allen IDs, acronyms, names, and colors
-4. save the per-object assignments as Parquet and the compact region report as
-   CSV
+4. uses `atlaslevels` to add canonical Allen IDs, acronyms, names, and colors
+5. optionally writes the compact region report as CSV together with its visual
+   QC PNG
+
+The returned `RegionQuantificationResult` retains the remapped object dataset,
+the per-object assignments, the named region summary, and the optional CSV and
+QC paths. Project workflows can additionally save the assigned-object table,
+metadata sidecar, summary CSV, and automatic QC PNG with
+`save_instance_region_quantification_outputs()`.
 
 The primary outputs are:
 
 - `<subject>_objects_with_regions.parquet`
 - `<subject>_objects_with_regions_space.json`
 - `<subject>_region_summary.csv`
+- `<subject>_quantification_qc.png`
 
 Subject-space regional summaries are the canonical biological quantitative
 outputs.

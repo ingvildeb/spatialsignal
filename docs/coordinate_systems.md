@@ -115,11 +115,15 @@ The implemented atlas-aware instance workflow is:
 
 1. start from deduplicated objects in the native mask grid
 2. consume an `atlasspace` registration output folder
-3. load the warped annotation and optional brain mask in subject space
+3. load the warped annotation in subject space
 4. remap object coordinates into the annotation's registration grid
 5. sample one region ID per object
 6. summarize counts, region volume, density, median area, and median
    eccentricity by region
+
+Annotation background is sufficient for excluding non-region objects from the
+regional report. Brain-mask filtering is a separate concern for point or signal
+voxelization rather than a requirement for atlas-region assignment.
 
 This keeps the biological measurements tied to the subject's own tissue geometry.
 The remapping changes sampling grids within the same subject anatomy; it does not

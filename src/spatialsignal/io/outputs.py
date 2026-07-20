@@ -22,6 +22,7 @@ from spatialsignal.models import (
 from spatialsignal.voxelization.nifti import build_nifti_ras_affine
 
 if TYPE_CHECKING:
+    from spatialsignal.integration import LabelVolume
     from spatialsignal.pointcloud.deduplicate import DeduplicationResult
 
 
@@ -52,6 +53,7 @@ class InstanceRegionQuantificationOutputPaths:
     assigned_objects_table: Path
     assigned_objects_json: Path
     region_summary_csv: Path
+    qc_png: Path | None
 
 
 def make_subject_output_stem(subject_name: str) -> str:
@@ -196,8 +198,13 @@ def save_instance_region_quantification_outputs(
     source_name: str,
     parameters: dict[str, Any] | None = None,
     output_stem: str | None = None,
+    annotation: LabelVolume | None = None,
+    write_qc: bool = True,
 ) -> InstanceRegionQuantificationOutputPaths:
-    """Save region-assigned object tables and per-region summaries."""
+    """Save region-assigned objects, regional summaries, and visual QC."""
+
+    if write_qc and annotation is None:
+        raise ValueError("annotation is required when write_qc is True")
 
     subject_name = source_name.removesuffix("_objects.parquet").removesuffix(".parquet")
     if output_stem is None:
@@ -207,6 +214,7 @@ def save_instance_region_quantification_outputs(
     assigned_objects_table = out_dir / f"{output_stem}_objects_with_regions.parquet"
     assigned_objects_json = out_dir / f"{output_stem}_objects_with_regions_space.json"
     region_summary_csv = out_dir / f"{output_stem}_region_summary.csv"
+    qc_png = out_dir / f"{output_stem}_quantification_qc.png" if write_qc else None
 
     processing_metadata = ProcessingProvenance(
         stage="assign_objects_to_regions",
@@ -233,9 +241,19 @@ def save_instance_region_quantification_outputs(
     assigned_objects.to_parquet(assigned_objects_table, index=False)
     assigned_metadata.to_json(assigned_objects_json)
     region_summary.to_csv(region_summary_csv, index=False)
+    if qc_png is not None:
+        from spatialsignal.quantification import write_region_quantification_qc
+
+        assigned_dataset = PointCloudDataset(
+            subject_name=subject_name,
+            points=assigned_objects,
+            metadata=assigned_metadata,
+        )
+        write_region_quantification_qc(assigned_dataset, annotation, qc_png)
 
     return InstanceRegionQuantificationOutputPaths(
         assigned_objects_table=assigned_objects_table,
         assigned_objects_json=assigned_objects_json,
         region_summary_csv=region_summary_csv,
+        qc_png=qc_png,
     )
