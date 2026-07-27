@@ -1,0 +1,23 @@
+# spatialsignal_template_id = colocalization
+# spatialsignal_template_revision = 2026-07-24
+# Match two existing centroid point clouds within exact z planes.
+
+[input_a]
+table = 'C:\path\to\channel_a\subject_pointcloud.parquet'
+space_json = 'C:\path\to\channel_a\subject_pointcloud_space.json'
+name = "channel_a"
+
+[input_b]
+table = 'C:\path\to\channel_b\subject_pointcloud.parquet'
+space_json = 'C:\path\to\channel_b\subject_pointcloud_space.json'
+name = "channel_b"
+
+[matching]
+max_xy_distance_um = 5.0
+
+[output]
+out_dir = 'C:\path\to\colocalization_output'
+
+[qc]
+write = true
+marker_radius_px = 2

@@ -11,6 +11,7 @@ def test_list_templates_returns_expected_ids() -> None:
     assert list_templates() == [
         "build_pointcloud",
         "build_signal_points",
+        "colocalization",
         "voxelize_signal_masks",
     ]
 

@@ -12,6 +12,7 @@ in place, but some APIs may still evolve as the package is tested in real use.
 - centroid point clouds from labeled instance-segmentation masks
 - dense signal-support point tables from binary semantic masks
 - cross-plane deduplication of repeated detections
+- exact-plane, one-to-one colocalization matching between centroid point clouds
 - subject-space voxelization into count maps and fraction maps
 - subject-space object-to-region assignment with atlas names, counts, densities, and 2D morphology measurements
 - optional hierarchy-level instance summaries using curated `atlaslevels` bundles
@@ -517,6 +518,7 @@ Starter templates currently include:
 
 - `build_pointcloud`
 - `build_signal_points`
+- `colocalization`
 - `voxelize_signal_masks`
 
 Starter configs use zero-based indexing, explicit `[space]` metadata, and
@@ -528,6 +530,7 @@ Runnable wrappers in `examples/` demonstrate local-file and config-driven use:
 
 - `examples/build_pointcloud.py`
 - `examples/build_signal_points.py`
+- `examples/colocalize_pointclouds.py`
 - `examples/deduplicate_across_planes.py`
 - `examples/quantify_objects_by_region.py`
 - `examples/test_python_workflow.py`

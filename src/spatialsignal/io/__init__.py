@@ -2,11 +2,13 @@
 
 from .masks import assign_slices, find_mask_files
 from .outputs import (
+    ColocalizationOutputPaths,
     DeduplicationOutputPaths,
     InstanceRegionQuantificationOutputPaths,
     VoxelMapOutputPaths,
     make_subject_output_stem,
     save_deduplication_outputs,
+    save_colocalization_outputs,
     save_instance_region_quantification_outputs,
     save_voxel_map_outputs,
     write_nifti_voxel_map,
@@ -15,10 +17,12 @@ from .outputs import (
 __all__ = [
     "assign_slices",
     "find_mask_files",
+    "ColocalizationOutputPaths",
     "DeduplicationOutputPaths",
     "InstanceRegionQuantificationOutputPaths",
     "VoxelMapOutputPaths",
     "make_subject_output_stem",
+    "save_colocalization_outputs",
     "save_deduplication_outputs",
     "save_instance_region_quantification_outputs",
     "save_voxel_map_outputs",

@@ -44,6 +44,26 @@ The object table preserves native subject-space coordinates. Morphology is
 averaged across the object's contributing 2D detections; these measurements
 describe in-plane segmentation morphology, not reconstructed 3D cell shape.
 
+### Colocalize two centroid channels
+
+`match_colocalized_detections()` compares two compatible raw
+`PointCloudDataset` instances only within equal z indices. It builds candidate
+pairs from physical XY distance and selects a maximum-cardinality,
+minimum-distance one-to-one matching independently in each plane. Z resolution
+does not enter the colocalization distance.
+
+`save_colocalization_outputs()` writes the accepted detection relationships as
+Parquet, a dedicated JSON provenance sidecar, one coordinate-aligned transparent
+PNG for every declared plane, and a filterable per-plane XLSX report. These
+relational outputs avoid duplicating complete A-only, B-only, and union point
+clouds.
+
+After each channel is deduplicated, `map_detection_matches_to_objects()` uses
+the channel membership tables to lift raw matching evidence to cleaned-object
+relationships. Ordinary relationships are one-to-one. One-to-many or
+many-to-many relationships are retained and explicitly classified for QC; the
+package does not silently discard or force-resolve them.
+
 ### 3. Quantify objects by region
 
 The registration integration layer consumes an `atlasspace` output folder and

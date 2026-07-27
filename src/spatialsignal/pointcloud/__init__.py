@@ -9,6 +9,15 @@ from .centroids import (
     extract_centroids_from_mask_stack,
     matlab_round,
 )
+from .colocalization import (
+    MATCH_COLUMNS,
+    OBJECT_RELATIONSHIP_COLUMNS,
+    PLANE_SUMMARY_COLUMNS,
+    ColocalizationResult,
+    ObjectRelationshipResult,
+    map_detection_matches_to_objects,
+    match_colocalized_detections,
+)
 from .signal_points import (
     SIGNAL_POINT_REQUIRED_COLUMNS,
     extract_signal_points_from_mask,
@@ -54,8 +63,13 @@ __all__ = [
     "ProcessingProvenance",
     "SpaceDefinition",
     "CLEANED_OBJECT_REQUIRED_COLUMNS",
+    "ColocalizationResult",
     "DeduplicationResult",
     "EDGE_COLUMNS",
+    "MATCH_COLUMNS",
+    "OBJECT_RELATIONSHIP_COLUMNS",
+    "ObjectRelationshipResult",
+    "PLANE_SUMMARY_COLUMNS",
     "ValidationReport",
     "aggregate_cleaned_objects",
     "build_dataset_metadata",
@@ -69,6 +83,8 @@ __all__ = [
     "extract_signal_points_from_mask_stack",
     "load_canonical_pointcloud_csv",
     "load_legacy_matlab_centroids_csv",
+    "map_detection_matches_to_objects",
+    "match_colocalized_detections",
     "matlab_round",
     "relabel_slices_in_natural_order",
     "summarize_deduplication_result",

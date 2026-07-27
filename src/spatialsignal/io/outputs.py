@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from dataclasses import replace
+import json
 from pathlib import Path
 import re
 from typing import TYPE_CHECKING, Any
@@ -23,6 +24,10 @@ from spatialsignal.voxelization.nifti import build_nifti_ras_affine
 
 if TYPE_CHECKING:
     from spatialsignal.integration import LabelVolume
+    from spatialsignal.pointcloud.colocalization import (
+        ColocalizationResult,
+        ObjectRelationshipResult,
+    )
     from spatialsignal.pointcloud.deduplicate import DeduplicationResult
 
 
@@ -44,6 +49,17 @@ class DeduplicationOutputPaths:
     objects_json: Path
     membership_table: Path
     edges_table: Path | None
+
+
+@dataclass(frozen=True)
+class ColocalizationOutputPaths:
+    """Paths written for saved colocalization evidence and QC."""
+
+    matches_table: Path
+    relationships_table: Path | None
+    metadata_path: Path
+    qc_report: Path | None
+    qc_images_dir: Path | None
 
 
 @dataclass(frozen=True)
@@ -186,6 +202,113 @@ def save_deduplication_outputs(
         objects_json=objects_json,
         membership_table=membership_table,
         edges_table=edges_table,
+    )
+
+
+def save_colocalization_outputs(
+    dataset_a: PointCloudDataset,
+    dataset_b: PointCloudDataset,
+    result: ColocalizationResult,
+    out_dir: Path,
+    *,
+    channel_a_name: str,
+    channel_b_name: str,
+    max_xy_distance_um: float,
+    object_relationships: ObjectRelationshipResult | None = None,
+    source_a: str | None = None,
+    source_b: str | None = None,
+    output_stem: str | None = None,
+    write_qc: bool = True,
+    marker_radius_px: int = 2,
+) -> ColocalizationOutputPaths:
+    """Save detection matches, object relationships, provenance, and QC."""
+
+    if output_stem is None:
+        output_stem = make_subject_output_stem(dataset_a.subject_name)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    matches_table = out_dir / f"{output_stem}_detection_matches.parquet"
+    relationships_table = (
+        out_dir / f"{output_stem}_object_relationships.parquet"
+        if object_relationships is not None
+        else None
+    )
+    metadata_path = out_dir / f"{output_stem}_colocalization_metadata.json"
+    qc_report = (
+        out_dir / f"{output_stem}_colocalization_qc.xlsx" if write_qc else None
+    )
+    qc_images_dir = out_dir / "qc_images" if write_qc else None
+
+    result.matches.to_parquet(matches_table, index=False)
+    if relationships_table is not None and object_relationships is not None:
+        object_relationships.relationships.to_parquet(relationships_table, index=False)
+
+    relationship_summary: dict[str, int] = {}
+    if object_relationships is not None and not object_relationships.relationships.empty:
+        relationship_summary = {
+            str(status): int(count)
+            for status, count in object_relationships.relationships[
+                "relationship_status"
+            ].value_counts().items()
+        }
+    metadata = {
+        "schema_name": "spatialsignal.colocalization",
+        "schema_version": "0.1.0",
+        "subject_name": dataset_a.subject_name,
+        "space": dataset_a.space.to_dict(),
+        "channels": {
+            "a": {"name": channel_a_name, "source": source_a},
+            "b": {"name": channel_b_name, "source": source_b},
+        },
+        "processing": {
+            "stage": "match_colocalized_detections",
+            "parameters": {
+                "max_xy_distance_um": float(max_xy_distance_um),
+                "z_rule": "exact_plane",
+                "matching_rule": "maximum_cardinality_minimum_distance_one_to_one",
+            },
+            "summary": {
+                "a_detections": int(len(dataset_a.points)),
+                "b_detections": int(len(dataset_b.points)),
+                "accepted_detection_matches": int(len(result.matches)),
+                "ambiguous_detection_matches": int(
+                    result.matches["is_ambiguous"].sum()
+                ),
+                "object_relationship_status_counts": relationship_summary,
+            },
+        },
+    }
+    with metadata_path.open("w", encoding="utf-8") as handle:
+        json.dump(metadata, handle, indent=2)
+        handle.write("\n")
+
+    if write_qc and qc_images_dir is not None and qc_report is not None:
+        from spatialsignal.qc import (
+            write_colocalization_images,
+            write_colocalization_report,
+        )
+
+        image_paths = write_colocalization_images(
+            dataset_a,
+            dataset_b,
+            result,
+            qc_images_dir,
+            output_stem=output_stem,
+            marker_radius_px=marker_radius_px,
+        )
+        write_colocalization_report(
+            result.plane_summary,
+            image_paths,
+            qc_report,
+            channel_a_name=channel_a_name,
+            channel_b_name=channel_b_name,
+        )
+
+    return ColocalizationOutputPaths(
+        matches_table=matches_table,
+        relationships_table=relationships_table,
+        metadata_path=metadata_path,
+        qc_report=qc_report,
+        qc_images_dir=qc_images_dir,
     )
 
 

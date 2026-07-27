@@ -8,11 +8,13 @@ from typing import Iterator
 
 BUILD_POINTCLOUD_TEMPLATE = "build_pointcloud_template.toml"
 BUILD_SIGNAL_POINTS_TEMPLATE = "build_signal_points_template.toml"
+COLOCALIZATION_TEMPLATE = "colocalization_template.toml"
 VOXELIZE_SIGNAL_MASKS_TEMPLATE = "voxelize_signal_masks_template.toml"
 
 TEMPLATE_FILES = {
     "build_pointcloud": BUILD_POINTCLOUD_TEMPLATE,
     "build_signal_points": BUILD_SIGNAL_POINTS_TEMPLATE,
+    "colocalization": COLOCALIZATION_TEMPLATE,
     "voxelize_signal_masks": VOXELIZE_SIGNAL_MASKS_TEMPLATE,
 }
 
@@ -78,6 +80,7 @@ def scaffold_template(
 __all__ = [
     "BUILD_POINTCLOUD_TEMPLATE",
     "BUILD_SIGNAL_POINTS_TEMPLATE",
+    "COLOCALIZATION_TEMPLATE",
     "TEMPLATE_FILES",
     "VOXELIZE_SIGNAL_MASKS_TEMPLATE",
     "as_template_path",
