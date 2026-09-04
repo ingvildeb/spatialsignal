@@ -10,7 +10,7 @@ import pandas as pd
 from spatialsignal.io import save_instance_region_quantification_outputs
 from spatialsignal.integration import (
     load_atlasspace_registration_folder,
-    load_registration_annotation_volume,
+    load_label_volume,
 )
 from spatialsignal.models import DatasetMetadata, PointCloudDataset
 from spatialsignal.quantification import quantify_objects_by_region
@@ -56,6 +56,11 @@ def parse_args() -> argparse.Namespace:
         help="Transformed segmentation name to use as the annotation volume.",
     )
     parser.add_argument(
+        "--hemisphere-name",
+        default="hemispheres",
+        help="Transformed segmentation name for the BrainGlobe hemisphere map.",
+    )
+    parser.add_argument(
         "--include-background",
         action="store_true",
         help="Include annotation label 0 in the per-region summary output.",
@@ -90,14 +95,29 @@ def main() -> int:
     )
     objects_dataset.validate_spatial_points()
 
-    registration = load_atlasspace_registration_folder(
-        Path(args.registration_dir),
-        annotation_name=args.annotation_name,
+    registration = load_atlasspace_registration_folder(Path(args.registration_dir))
+    try:
+        annotation_path = registration.transformed_segmentations[
+            args.annotation_name
+        ]
+        hemisphere_path = registration.transformed_segmentations[
+            args.hemisphere_name
+        ]
+    except KeyError as exc:
+        raise KeyError(
+            "Registration does not declare transformed segmentation "
+            f"{exc.args[0]!r}; available segmentations are "
+            f"{sorted(registration.transformed_segmentations)}"
+        ) from exc
+    annotation_volume = load_label_volume(annotation_path)
+    hemisphere_volume = load_label_volume(
+        hemisphere_path,
+        space_name=annotation_volume.space.space_name,
     )
-    annotation_volume = load_registration_annotation_volume(registration)
     result = quantify_objects_by_region(
         objects_dataset,
         annotation_volume,
+        hemisphere=hemisphere_volume,
         ontology_preset=args.ontology_preset,
         region_id_space=args.region_id_space,
         include_background=args.include_background,
@@ -113,6 +133,8 @@ def main() -> int:
         parameters={
             "registration_dir": str(args.registration_dir),
             "annotation_name": args.annotation_name,
+            "hemisphere_name": args.hemisphere_name,
+            "hemisphere_path": str(hemisphere_path),
             "include_background": args.include_background,
             "ontology_preset": args.ontology_preset,
             "region_id_space": args.region_id_space,
@@ -130,7 +152,8 @@ def main() -> int:
     print("Subject-space region quantification complete")
     print(f"  subject_name: {subject_name}")
     print(f"  registration_dir: {args.registration_dir}")
-    print(f"  annotation_path: {registration.annotation_path}")
+    print(f"  annotation_path: {annotation_path}")
+    print(f"  hemisphere_path: {hemisphere_path}")
     print(f"  assigned_objects_table: {output_paths.assigned_objects_table}")
     print(f"  assigned_objects_json: {output_paths.assigned_objects_json}")
     print(f"  region_summary_csv: {output_paths.region_summary_csv}")

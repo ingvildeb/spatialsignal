@@ -5,8 +5,6 @@ from .registration import (
     RegistrationOutputFolder,
     load_atlasspace_registration_folder,
     load_label_volume,
-    load_registration_annotation_volume,
-    load_registration_brain_mask_volume,
 )
 
 __all__ = [
@@ -14,6 +12,4 @@ __all__ = [
     "RegistrationOutputFolder",
     "load_atlasspace_registration_folder",
     "load_label_volume",
-    "load_registration_annotation_volume",
-    "load_registration_brain_mask_volume",
 ]

@@ -21,11 +21,12 @@ class SpaceDefinition:
     units: str
     shape: list[int]
     resolution_um: list[float]
+    affine_ras_mm: list[list[float]] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Convert the spatial definition to a plain dictionary."""
 
-        return {
+        data = {
             "space_name": self.space_name,
             "orientation": self.orientation,
             "axis_labels": self.axis_labels,
@@ -34,6 +35,9 @@ class SpaceDefinition:
             "shape": self.shape,
             "resolution_um": self.resolution_um,
         }
+        if self.affine_ras_mm is not None:
+            data["affine_ras_mm"] = self.affine_ras_mm
+        return data
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "SpaceDefinition":
@@ -47,6 +51,7 @@ class SpaceDefinition:
             units=data["units"],
             shape=data["shape"],
             resolution_um=data["resolution_um"],
+            affine_ras_mm=data.get("affine_ras_mm"),
         )
 
     @classmethod

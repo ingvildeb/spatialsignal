@@ -77,7 +77,11 @@ def deduplicate_across_planes(
     max_xy_distance_um: float,
     max_n_planes: int | None = None,
 ) -> DeduplicationResult:
-    """Merge raw detections that likely represent the same cell across planes."""
+    """Merge raw detections that likely represent the same cell across planes.
+
+    Every cleaned object is constrained to contain at most one detection from
+    any given plane.
+    """
 
     if max_plane_offset < 1:
         raise ValueError(f"max_plane_offset must be >= 1, got {max_plane_offset}")
@@ -100,6 +104,13 @@ def deduplicate_across_planes(
         max_n_planes=max_n_planes,
     )
     objects = aggregate_cleaned_objects(points, membership)
+    invalid = objects["n_detections"] != objects["n_planes"]
+    if invalid.any():
+        invalid_ids = objects.loc[invalid, "object_id"].astype(int).tolist()
+        raise RuntimeError(
+            "Deduplication produced objects with multiple detections from the "
+            f"same plane: object IDs {invalid_ids[:10]}"
+        )
     return DeduplicationResult(edges=accepted_edges, membership=membership, objects=objects)
 
 
@@ -309,7 +320,7 @@ def _connected_components(
     *,
     max_n_planes: int | None = None,
 ) -> tuple[list[list[int]], pd.DataFrame]:
-    """Find connected components over detection IDs using union-find."""
+    """Find plane-unique connected components over detection IDs."""
 
     parent = {detection_id: detection_id for detection_id in detection_ids}
     component_planes = {detection_id: {detection_to_z[detection_id]} for detection_id in detection_ids}
@@ -345,10 +356,15 @@ def _connected_components(
         root_source = find(source_detection_id)
         root_target = find(target_detection_id)
 
-        if root_source != root_target and max_n_planes is not None:
-            merged_planes = component_planes[root_source] | component_planes[root_target]
-            if len(merged_planes) > max_n_planes:
+        if root_source != root_target:
+            source_planes = component_planes[root_source]
+            target_planes = component_planes[root_target]
+            if not source_planes.isdisjoint(target_planes):
                 continue
+            if max_n_planes is not None:
+                merged_planes = source_planes | target_planes
+                if len(merged_planes) > max_n_planes:
+                    continue
 
         union(source_detection_id, target_detection_id)
         accepted_edge_rows.append(

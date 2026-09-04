@@ -11,6 +11,8 @@ import pandas as pd
 
 from spatialsignal.models import PointCloudDataset, ProcessingProvenance, SpaceDefinition
 
+from .hemispheres import HEMISPHERE_NAMES
+
 
 OUT_OF_BOUNDS_REGION_ID = -1
 REGION_ASSIGNMENT_COLUMNS = ["x", "y", "z"]
@@ -213,6 +215,50 @@ def assign_objects_to_regions(
     assigned["in_bounds"] = in_bounds
     assigned["in_brain"] = in_brain
     assigned["assignment_status"] = assignment_status
+    return assigned
+
+
+def assign_objects_to_hemispheres(
+    objects: pd.DataFrame,
+    object_space: SpaceDefinition,
+    hemisphere_data: np.ndarray,
+    *,
+    prefer_float_columns: bool = True,
+) -> pd.DataFrame:
+    """Sample BrainGlobe hemisphere IDs for objects already on the map grid.
+
+    In-bounds voxels carrying ``1`` and ``2`` are reported as ``left`` and
+    ``right`` respectively. Objects outside the volume, or on any permitted
+    non-brain padding value, retain missing hemisphere fields.
+    """
+
+    _validate_object_table(objects)
+    _validate_volume_shape(hemisphere_data, object_space, volume_name="hemisphere")
+    x_idx, y_idx, z_idx = _rounded_zero_based_indices(
+        objects,
+        object_space,
+        prefer_float_columns=prefer_float_columns,
+    )
+    in_bounds = _in_bounds_mask(x_idx, y_idx, z_idx, object_space)
+
+    sampled = np.zeros(len(objects), dtype=np.int8)
+    sampled[in_bounds] = np.asarray(
+        hemisphere_data[x_idx[in_bounds], y_idx[in_bounds], z_idx[in_bounds]]
+    ).astype(np.int8, copy=False)
+
+    hemisphere_ids = pd.array([pd.NA] * len(objects), dtype="Int8")
+    hemisphere_names = np.full(len(objects), None, dtype=object)
+    for hemisphere_id, hemisphere_name in HEMISPHERE_NAMES.items():
+        selected = in_bounds & (sampled == hemisphere_id)
+        hemisphere_ids[selected] = hemisphere_id
+        hemisphere_names[selected] = hemisphere_name
+
+    assigned = objects.copy()
+    assigned["hemisphere_id"] = hemisphere_ids
+    assigned["hemisphere"] = pd.Categorical(
+        hemisphere_names,
+        categories=list(HEMISPHERE_NAMES.values()),
+    )
     return assigned
 
 

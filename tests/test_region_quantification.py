@@ -68,6 +68,14 @@ def _annotation() -> LabelVolume:
     )
 
 
+def _hemisphere() -> LabelVolume:
+    return LabelVolume(
+        path=Path("subject_hemispheres.nii.gz"),
+        data=np.array([[[1]], [[2]], [[2]]], dtype=np.uint8),
+        space=_space(),
+    )
+
+
 def test_quantify_objects_by_region_returns_named_summary_and_writes_csv(
     tmp_path: Path,
 ) -> None:
@@ -118,7 +126,46 @@ def test_quantify_objects_by_region_can_include_annotation_background() -> None:
     assert set(result.region_summary["region_id"]) == {0, 68, 667}
     background = result.region_summary.loc[result.region_summary["region_id"] == 0].iloc[0]
     assert background["region_name"] == "Background"
-    assert background["object_count"] == 1
+    assert background["bilateral_object_count"] == 1
+
+
+def test_quantify_objects_by_region_reports_bilateral_left_and_right_metrics() -> None:
+    result = quantify_objects_by_region(
+        _objects(),
+        _annotation(),
+        hemisphere=_hemisphere(),
+        ontology_preset="allen_ccfv3",
+        region_id_space="allen",
+    )
+
+    assert result.assigned_objects["hemisphere"].astype("string").tolist() == [
+        "left",
+        "right",
+        "right",
+    ]
+    region_68 = result.region_summary.loc[
+        result.region_summary["region_id"] == 68
+    ].iloc[0]
+    assert region_68["bilateral_object_count"] == 1
+    assert region_68["left_object_count"] == 1
+    assert region_68["right_object_count"] == 0
+    assert region_68["bilateral_region_voxels"] == 1
+    assert region_68["left_region_voxels"] == 1
+    assert region_68["right_region_voxels"] == 0
+    assert region_68["left_object_density_per_mm3"] == 1_000_000.0
+    assert np.isnan(region_68["right_object_density_per_mm3"])
+
+
+def test_quantify_objects_by_region_rejects_unassigned_annotated_hemisphere() -> None:
+    hemisphere = _hemisphere()
+    hemisphere.data[2, 0, 0] = 0
+
+    with pytest.raises(ValueError, match="Every annotated voxel"):
+        quantify_objects_by_region(
+            _objects(),
+            _annotation(),
+            hemisphere=hemisphere,
+        )
 
 
 def test_quantify_objects_by_region_requires_csv_output_suffix(tmp_path: Path) -> None:

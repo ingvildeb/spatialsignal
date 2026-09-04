@@ -327,7 +327,21 @@ print(f"{len(dataset.points)} detections -> {len(result.objects)} objects")
 
 `result` contains the cleaned object table, the raw-detection membership table,
 and the accepted cross-plane edges. The saved object sidecar also records the
-deduplication parameters and summary.
+deduplication parameters and summary. Candidate edges are evaluated from
+shortest to longest XY distance, and a component merge is rejected if the two
+components already contain detections from any shared plane. Every cleaned
+object therefore contains at most one detection per plane. `max_n_planes`
+places an additional cap on the number of distinct planes represented.
+
+For morphology-preserving deduplication QC, `spatialsignal.qc` provides the
+original pairwise red/green mask writer plus crop-level building blocks:
+`read_mask_crop` memory-maps small regions from large TIFF masks, and
+`render_duplicate_status_mask` colors linked instances green and unlinked
+instances red. These helpers allow parameter sweeps to compare the same source
+planes and XY crop without allocating or writing full-brain RGB masks.
+`render_duplicate_status_labels` and `duplicate_status_colormap` provide an
+ImageJ-compatible indexed-color representation for full-resolution TIFF QC:
+0 is black background, 1 is red unlinked signal, and 2 is green linked signal.
 
 ### Voxelize cleaned objects
 
@@ -432,10 +446,15 @@ objects = PointCloudDataset.from_files(
 annotation = load_label_volume(
     Path("outputs/subject_001_registration/annotation_WarpedSegmentation.nii.gz")
 )
+hemisphere = load_label_volume(
+    Path("outputs/subject_001_registration/hemispheres_WarpedSegmentation.nii.gz"),
+    space_name=annotation.space.space_name,
+)
 
 result = quantify_objects_by_region(
     objects,
     annotation,
+    hemisphere=hemisphere,
     ontology_preset="allen_ccfv3",
     region_id_space="kimlab16bit",  # Use "allen" for an Allen-ID annotation.
     output_csv=Path("outputs/subject_001_region_summary.csv"),
@@ -444,7 +463,13 @@ result = quantify_objects_by_region(
 print(result.assigned_objects["assignment_status"].value_counts())
 print(
     result.region_summary[
-        ["region_acronym", "region_name", "object_count", "object_density_per_mm3"]
+        [
+            "region_acronym",
+            "region_name",
+            "bilateral_object_count",
+            "left_object_count",
+            "right_object_count",
+        ]
     ]
 )
 print(result.summary_csv)
@@ -457,10 +482,32 @@ transformed into subject space by `atlasspace`; loading the surrounding
 registration folder is not required. Its optional `space_name` is only a
 provenance label and defaults to the NIfTI filename stem.
 
+When starting from an AtlasSpace output folder, the generic registration loader
+reads the canonical `registration_result.json` manifest and resolves every
+declared segmentation path:
+
+```python
+from spatialsignal.integration import load_atlasspace_registration_folder
+
+registration = load_atlasspace_registration_folder("subject_001_registration")
+annotation = load_label_volume(registration.transformed_segmentations["labels"])
+hemisphere = load_label_volume(
+    registration.transformed_segmentations["hemispheres"],
+    space_name=annotation.space.space_name,
+)
+```
+
+Segmentation names have no built-in meaning to SpatialSignal. Annotations,
+hemisphere maps, brain masks, and future label volumes all follow this same path.
+Legacy `registration_summary.txt` files are not used.
+
 `quantify_objects_by_region` expresses the cleaned-object coordinates in its
-sampling grid, assigns region IDs, adds atlas names, and returns both the
-object-level assignments and regional summary. Passing `output_csv` also writes
-the summary to the requested CSV path and automatically writes the matching
+sampling grid, assigns region and hemisphere IDs, adds atlas names, and returns
+both the object-level assignments and regional summary. Hemisphere maps use the
+BrainGlobe convention `1 = left` and `2 = right`; every annotated voxel must be
+assigned. The summary reports bilateral, left, and right columns without changing
+the atlas region IDs. Passing `output_csv` also writes the summary to the requested
+CSV path and automatically writes the matching
 `subject_001_quantification_qc.png`.
 
 Objects sampling annotation ID `0` remain in `result.assigned_objects` with
@@ -469,6 +516,32 @@ Objects sampling annotation ID `0` remain in `result.assigned_objects` with
 information required for regional quantification; a separate brain mask is not
 needed. Set `region_id_space` to the ID namespace actually stored in the
 annotation.
+
+Semantic segmentation or fractional-occupancy maps on the annotation grid use
+the parallel regional quantifier:
+
+```python
+from spatialsignal.quantification import quantify_signal_by_region
+
+damage = load_label_volume(
+    Path("subject_001_damage_mask.nii.gz"),
+    space_name=annotation.space.space_name,
+)
+damage_result = quantify_signal_by_region(
+    damage,
+    annotation,
+    hemisphere=hemisphere,
+    region_id_space="kimlab16bit",
+    output_csv=Path("outputs/subject_001_damage_by_region.csv"),
+)
+```
+
+Signal values must lie in `[0, 1]`. For a binary map,
+`*_signal_voxel_equivalents` is the signal voxel count; fractional maps are
+integrated as partial voxel occupancy. Each scope reports its region voxels and
+volume, signal voxel equivalents and volume, and signal fraction. Project-specific
+eligibility rules such as erosion or ventricle exclusion belong in construction of
+the final input map, not in `quantify_signal_by_region`.
 
 See the [workflow guide](docs/workflow.md) and
 [region-quantification example](examples/quantify_objects_by_region.py) for the

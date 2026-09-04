@@ -44,13 +44,13 @@ This internal document tracks development status and planned work for
 - Compare object counts and regional summaries with previously validated data.
 - Spot-check area and eccentricity distributions for biological plausibility.
 
-### 2. Reference-space visualization for instance data
+### 2. Reference-space visualization
 
-- Consume the transform sequence from an `atlasspace` registration folder.
-- Transform deduplicated subject objects into the selected reference space.
-- Preserve source coordinates and transformation provenance.
-- Voxelize transformed objects into reference-space count maps.
-- Add explicit smoothing and boundary-handling helpers for visualization.
+- Design and validate subject-to-reference transformation as a separate feature.
+- Establish transform direction, coordinate conventions, output contracts, and
+  count-conservation behavior before implementation.
+- Add smoothing, boundary handling, and group displays only after the core
+  transformation has been validated across age-specific template grids.
 
 ### 3. Subject-space semantic quantification
 

@@ -18,6 +18,17 @@ def build_nifti_ras_affine(space: SpaceDefinition) -> np.ndarray:
     in millimeters, so the diagonal terms are converted from um to mm here.
     """
 
+    if space.affine_ras_mm is not None:
+        affine = np.asarray(space.affine_ras_mm, dtype=np.float64)
+        if affine.shape != (4, 4):
+            raise ValueError(
+                "affine_ras_mm must have shape (4, 4), got "
+                f"{affine.shape}"
+            )
+        if not np.all(np.isfinite(affine)):
+            raise ValueError("affine_ras_mm must contain only finite values")
+        return affine.copy()
+
     if len(space.orientation) != 3:
         raise ValueError(
             f"orientation must have length 3, got {space.orientation}"

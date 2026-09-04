@@ -12,7 +12,6 @@ from spatialsignal.models.metadata import DatasetMetadata
 from spatialsignal.pointcloud._indexing import resolve_slice_start, validate_indexing
 from spatialsignal.pointcloud.centroids import extract_centroids_from_mask_stack
 from spatialsignal.pointcloud.signal_points import extract_signal_points_from_mask_stack
-from spatialsignal.qc import write_centroid_images
 
 
 def build_pointcloud_from_masks(
@@ -75,6 +74,8 @@ def build_pointcloud_from_masks(
         print(f"Wrote point-cloud table to {table_path}")
         print(f"Wrote point cloud metadata to {metadata_path}")
     if write_qc_images:
+        from spatialsignal.qc import write_centroid_images
+
         if show_progress:
             print("Writing centroid QC images")
         write_centroid_images(

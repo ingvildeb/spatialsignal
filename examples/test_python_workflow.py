@@ -8,7 +8,7 @@ from spatialsignal.io import (
 )
 from spatialsignal.integration import (
     load_atlasspace_registration_folder,
-    load_registration_annotation_volume,
+    load_label_volume,
 )
 from spatialsignal.models import PointCloudDataset
 from spatialsignal.pointcloud import (
@@ -43,6 +43,7 @@ REGISTRATION_DIR: Path | None = None
 INCLUDE_BACKGROUND_REGION = False
 ONTOLOGY_PRESET = "allen_ccfv3"
 REGION_ID_SPACE = "kimlab16bit"
+ANNOTATION_NAME = "annotation"
 
 
 if __name__ == "__main__":
@@ -130,7 +131,8 @@ if __name__ == "__main__":
 
     if REGISTRATION_DIR is not None:
         registration = load_atlasspace_registration_folder(REGISTRATION_DIR)
-        annotation_volume = load_registration_annotation_volume(registration)
+        annotation_path = registration.transformed_segmentations[ANNOTATION_NAME]
+        annotation_volume = load_label_volume(annotation_path)
         quantification_result = quantify_objects_by_region(
             objects_dataset,
             annotation_volume,
@@ -147,7 +149,7 @@ if __name__ == "__main__":
             annotation=annotation_volume,
             parameters={
                 "registration_dir": str(REGISTRATION_DIR),
-                "annotation_path": str(registration.annotation_path),
+                "annotation_path": str(annotation_path),
                 "include_background_region": INCLUDE_BACKGROUND_REGION,
                 "ontology_preset": ONTOLOGY_PRESET,
                 "region_id_space": REGION_ID_SPACE,

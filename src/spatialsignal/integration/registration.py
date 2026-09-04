@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import ast
 from dataclasses import dataclass
+import json
 from pathlib import Path
-import re
 from typing import Any
 
 import nibabel as nib
@@ -14,15 +13,7 @@ import numpy as np
 from spatialsignal.models import SpaceDefinition
 
 
-_SUMMARY_PATH_KEYS = {
-    "fixed_image",
-    "moving_image",
-    "fixed_normalized_for_registration",
-    "moving_normalized_for_registration",
-    "output_dir",
-    "warped_image",
-    "inverse_warped_image",
-}
+REGISTRATION_RESULT_FILENAME = "registration_result.json"
 
 
 @dataclass(frozen=True)
@@ -30,11 +21,13 @@ class RegistrationOutputFolder:
     """Resolved view of an `atlasspace` registration output folder."""
 
     registration_dir: Path
-    summary_path: Path | None
+    manifest_path: Path
     parameters_path: Path | None
-    summary: dict[str, Any]
-    annotation_path: Path
-    brain_mask_path: Path | None
+    manifest: dict[str, Any]
+    fixed_image_path: Path
+    moving_image_path: Path
+    fixed_normalized_image_path: Path | None
+    moving_normalized_image_path: Path | None
     warped_image_path: Path | None
     inverse_warped_image_path: Path | None
     forward_transforms: list[Path]
@@ -53,75 +46,92 @@ class LabelVolume:
 
 def load_atlasspace_registration_folder(
     registration_dir: Path,
-    *,
-    annotation_name: str = "annotation",
-    brain_mask_name: str = "brain_mask",
 ) -> RegistrationOutputFolder:
-    """Load the pieces of an `atlasspace` registration output folder needed downstream."""
+    """Load an `atlasspace` result manifest and resolve every declared path.
+
+    Transformed segmentations remain a generic mapping keyed by their registration
+    segmentation IDs. Callers select the desired entry and load it with
+    :func:`load_label_volume`; annotations, brain masks, and hemisphere maps do
+    not require separate loader functions.
+    """
 
     registration_dir = Path(registration_dir)
-    summary_path = registration_dir / "registration_summary.txt"
-    parameters_path = registration_dir / "registration_parameters.yaml"
-    summary = _parse_registration_summary(summary_path) if summary_path.exists() else {}
+    manifest_path = registration_dir / REGISTRATION_RESULT_FILENAME
+    if not manifest_path.is_file():
+        raise FileNotFoundError(
+            f"AtlasSpace registration manifest is missing: {manifest_path}"
+        )
+    manifest = _load_json_object(manifest_path)
+    if manifest.get("schema_version") != 1:
+        raise ValueError(
+            "Unsupported AtlasSpace registration manifest schema_version: "
+            f"{manifest.get('schema_version')!r}"
+        )
+    if manifest.get("success") is not True:
+        raise ValueError(f"AtlasSpace registration was not successful: {manifest_path}")
 
-    transformed_segmentations = _normalize_path_dict(
-        summary.get("transformed_segmentations", {})
-    )
-    annotation_path = _resolve_segmentation_path(
+    fixed_image = _required_mapping(manifest, "fixed_image", manifest_path)
+    moving_image = _required_mapping(manifest, "moving_image", manifest_path)
+    transformed_segmentations = _resolve_path_mapping(
         registration_dir,
-        transformed_segmentations,
-        annotation_name,
+        manifest.get("transformed_segmentations", {}),
+        field_name="transformed_segmentations",
     )
-    brain_mask_path = _resolve_segmentation_path(
+    parameters_path = _resolve_optional_path(
         registration_dir,
-        transformed_segmentations,
-        brain_mask_name,
-        required=False,
+        manifest.get("parameters_snapshot"),
+        field_name="parameters_snapshot",
     )
-
-    warped_image_path = _optional_path(summary.get("warped_image"))
-    inverse_warped_image_path = _optional_path(summary.get("inverse_warped_image"))
-    forward_transforms = _normalize_path_list(summary.get("forward_transforms", []))
-    inverse_transforms = _normalize_path_list(summary.get("inverse_transforms", []))
+    fixed_image_path = _resolve_required_path(
+        registration_dir,
+        fixed_image.get("image"),
+        field_name="fixed_image.image",
+    )
+    moving_image_path = _resolve_required_path(
+        registration_dir,
+        moving_image.get("image"),
+        field_name="moving_image.image",
+    )
 
     return RegistrationOutputFolder(
         registration_dir=registration_dir,
-        summary_path=summary_path if summary_path.exists() else None,
-        parameters_path=parameters_path if parameters_path.exists() else None,
-        summary=summary,
-        annotation_path=annotation_path,
-        brain_mask_path=brain_mask_path,
-        warped_image_path=warped_image_path,
-        inverse_warped_image_path=inverse_warped_image_path,
-        forward_transforms=forward_transforms,
-        inverse_transforms=inverse_transforms,
+        manifest_path=manifest_path,
+        parameters_path=parameters_path,
+        manifest=manifest,
+        fixed_image_path=fixed_image_path,
+        moving_image_path=moving_image_path,
+        fixed_normalized_image_path=_resolve_optional_path(
+            registration_dir,
+            fixed_image.get("normalized_image"),
+            field_name="fixed_image.normalized_image",
+        ),
+        moving_normalized_image_path=_resolve_optional_path(
+            registration_dir,
+            moving_image.get("normalized_image"),
+            field_name="moving_image.normalized_image",
+        ),
+        warped_image_path=_resolve_optional_path(
+            registration_dir,
+            manifest.get("warped_image"),
+            field_name="warped_image",
+        ),
+        inverse_warped_image_path=_resolve_optional_path(
+            registration_dir,
+            manifest.get("inverse_warped_image"),
+            field_name="inverse_warped_image",
+        ),
+        forward_transforms=_resolve_path_list(
+            registration_dir,
+            manifest.get("forward_transforms", []),
+            field_name="forward_transforms",
+        ),
+        inverse_transforms=_resolve_path_list(
+            registration_dir,
+            manifest.get("inverse_transforms", []),
+            field_name="inverse_transforms",
+        ),
         transformed_segmentations=transformed_segmentations,
     )
-
-
-def load_registration_annotation_volume(
-    registration: RegistrationOutputFolder,
-) -> LabelVolume:
-    """Load the warped annotation from a registration output folder."""
-
-    space_name = str(
-        registration.summary.get("fixed_space_name", "registered_subject_space")
-    )
-    return load_label_volume(registration.annotation_path, space_name=space_name)
-
-
-def load_registration_brain_mask_volume(
-    registration: RegistrationOutputFolder,
-) -> LabelVolume | None:
-    """Load the warped brain mask from a registration output folder if present."""
-
-    if registration.brain_mask_path is None:
-        return None
-
-    space_name = str(
-        registration.summary.get("fixed_space_name", "registered_subject_space")
-    )
-    return load_label_volume(registration.brain_mask_path, space_name=space_name)
 
 
 def load_label_volume(
@@ -161,85 +171,115 @@ def _nifti_stem(path: Path) -> str:
     return path.stem
 
 
-def _parse_registration_summary(summary_path: Path) -> dict[str, Any]:
-    """Parse `registration_summary.txt` into a minimally typed dictionary."""
+def _load_json_object(path: Path) -> dict[str, Any]:
+    """Load one JSON object with a concise schema error."""
 
-    summary: dict[str, Any] = {}
-    for line in summary_path.read_text(encoding="utf-8").splitlines():
-        if not line or "=" not in line:
-            continue
-        key, raw_value = line.split("=", 1)
-        summary[key] = _parse_summary_value(key, raw_value)
-    return summary
-
-
-def _parse_summary_value(key: str, raw_value: str) -> Any:
-    """Parse one summary value, preserving strings when literal parsing is unsafe."""
-
-    raw_value = raw_value.strip()
-    if key in _SUMMARY_PATH_KEYS:
-        return raw_value
-
-    sanitized = re.sub(
-        r"(WindowsPath|PosixPath)\('([^']*)'\)",
-        lambda match: repr(match.group(2)),
-        raw_value,
-    )
     try:
-        return ast.literal_eval(sanitized)
-    except (SyntaxError, ValueError):
-        return raw_value
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Invalid JSON in AtlasSpace manifest {path}: {exc}") from exc
+    if not isinstance(value, dict):
+        raise ValueError(f"AtlasSpace manifest must contain a JSON object: {path}")
+    return value
 
 
-def _resolve_segmentation_path(
-    registration_dir: Path,
-    transformed_segmentations: dict[str, Path],
-    segmentation_name: str,
-    *,
-    required: bool = True,
-) -> Path | None:
-    """Resolve a transformed segmentation path from summary metadata or standard naming."""
+def _required_mapping(
+    manifest: dict[str, Any],
+    field_name: str,
+    manifest_path: Path,
+) -> dict[str, Any]:
+    """Read a required object-valued manifest field."""
 
-    if segmentation_name in transformed_segmentations:
-        path = transformed_segmentations[segmentation_name]
-        if path.exists():
-            return path
-
-    fallback = registration_dir / f"{segmentation_name}_WarpedSegmentation.nii.gz"
-    if fallback.exists():
-        return fallback
-
-    if required:
-        raise FileNotFoundError(
-            f"Could not find transformed segmentation '{segmentation_name}' in {registration_dir}"
+    value = manifest.get(field_name)
+    if not isinstance(value, dict):
+        raise ValueError(
+            f"AtlasSpace manifest field {field_name!r} must be an object: "
+            f"{manifest_path}"
         )
-    return None
+    return value
 
 
-def _normalize_path_list(value: Any) -> list[Path]:
-    """Normalize a summary value into a list of paths."""
+def _resolve_required_path(
+    registration_dir: Path,
+    value: Any,
+    *,
+    field_name: str,
+) -> Path:
+    """Resolve a required manifest path relative to its registration folder."""
+
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(
+            f"AtlasSpace manifest field {field_name!r} must be a non-empty path"
+        )
+    return _resolve_path(registration_dir, value)
+
+
+def _resolve_optional_path(
+    registration_dir: Path,
+    value: Any,
+    *,
+    field_name: str,
+) -> Path | None:
+    """Resolve an optional manifest path relative to its registration folder."""
 
     if value is None:
-        return []
-    if isinstance(value, (str, Path)):
-        return [Path(value)]
-    return [Path(item) for item in value]
-
-
-def _normalize_path_dict(value: Any) -> dict[str, Path]:
-    """Normalize a summary value into a dictionary of paths."""
-
-    if not value:
-        return {}
-    return {str(key): Path(path_value) for key, path_value in value.items()}
-
-
-def _optional_path(value: Any) -> Path | None:
-    """Normalize an optional summary value into a path."""
-
-    if value in (None, "", "None"):
         return None
-    return Path(value)
+    return _resolve_required_path(
+        registration_dir,
+        value,
+        field_name=field_name,
+    )
+
+
+def _resolve_path_list(
+    registration_dir: Path,
+    value: Any,
+    *,
+    field_name: str,
+) -> list[Path]:
+    """Resolve one list of manifest paths."""
+
+    if not isinstance(value, list):
+        raise ValueError(f"AtlasSpace manifest field {field_name!r} must be a list")
+    return [
+        _resolve_required_path(
+            registration_dir,
+            item,
+            field_name=f"{field_name}[{index}]",
+        )
+        for index, item in enumerate(value)
+    ]
+
+
+def _resolve_path_mapping(
+    registration_dir: Path,
+    value: Any,
+    *,
+    field_name: str,
+) -> dict[str, Path]:
+    """Resolve one string-keyed mapping of manifest paths."""
+
+    if not isinstance(value, dict):
+        raise ValueError(f"AtlasSpace manifest field {field_name!r} must be an object")
+    resolved: dict[str, Path] = {}
+    for key, item in value.items():
+        if not isinstance(key, str) or not key:
+            raise ValueError(
+                f"AtlasSpace manifest field {field_name!r} has an invalid key: {key!r}"
+            )
+        resolved[key] = _resolve_required_path(
+            registration_dir,
+            item,
+            field_name=f"{field_name}.{key}",
+        )
+    return resolved
+
+
+def _resolve_path(registration_dir: Path, value: str) -> Path:
+    """Resolve one absolute or registration-relative path."""
+
+    path = Path(value)
+    return path if path.is_absolute() else registration_dir / path
 
 
 def _space_from_nifti_image(
@@ -271,6 +311,7 @@ def _space_from_nifti_image(
         units="voxel",
         shape=[int(value) for value in shape],
         resolution_um=resolution_um,
+        affine_ras_mm=np.asarray(image.affine, dtype=np.float64).tolist(),
     )
 
 

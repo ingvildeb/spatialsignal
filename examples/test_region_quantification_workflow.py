@@ -5,7 +5,7 @@ import pandas as pd
 from spatialsignal.io import save_instance_region_quantification_outputs
 from spatialsignal.integration import (
     load_atlasspace_registration_folder,
-    load_registration_annotation_volume,
+    load_label_volume,
 )
 from spatialsignal.models import DatasetMetadata, PointCloudDataset
 from spatialsignal.quantification import quantify_objects_by_region
@@ -52,11 +52,11 @@ if __name__ == "__main__":
     )
     objects_dataset.validate_spatial_points()
 
-    registration = load_atlasspace_registration_folder(
-        REGISTRATION_DIR,
-        annotation_name=ANNOTATION_NAME,
+    registration = load_atlasspace_registration_folder(REGISTRATION_DIR)
+    annotation_path = registration.transformed_segmentations[ANNOTATION_NAME]
+    annotation_volume = load_label_volume(
+        annotation_path,
     )
-    annotation_volume = load_registration_annotation_volume(registration)
     result = quantify_objects_by_region(
         objects_dataset,
         annotation_volume,
@@ -91,7 +91,7 @@ if __name__ == "__main__":
 
     print("Subject-space region quantification complete")
     print(f"  subject_name: {subject_name}")
-    print(f"  annotation_path: {registration.annotation_path}")
+    print(f"  annotation_path: {annotation_path}")
     print(f"  assigned_objects_table: {output_paths.assigned_objects_table}")
     print(f"  assigned_objects_json: {output_paths.assigned_objects_json}")
     print(f"  region_summary_csv: {output_paths.region_summary_csv}")

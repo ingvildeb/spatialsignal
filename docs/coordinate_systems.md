@@ -134,10 +134,10 @@ apply the subject-to-template transform to create reference-space points.
 Reference-space maps are useful for visualization and cross-subject comparison after anatomical
 alignment.
 
-The planned instance strategy is to transform deduplicated subject objects into
-the reference space, retain source coordinates and provenance, voxelize the
-transformed objects on the reference grid, and derive smoothed or
-boundary-corrected visualization maps from that representation.
+The transformation of instance data back into reference space is intentionally
+deferred. Its transform direction, coordinate conventions, output contract,
+and count-conservation behavior require dedicated validation before the package
+exposes a production API.
 
 However, an unmodulated aligned map should not automatically be interpreted as native cell density.
 After nonlinear warping, local expansion or compression can change how many points fall into a
@@ -173,7 +173,9 @@ core spatial model.
 ## NIfTI Export Orientation
 
 When writing NIfTI outputs, the package converts from the repo's BrainGlobe origin-based
-orientation convention into NIfTI's affine-based RAS world convention explicitly.
+orientation convention into NIfTI's affine-based RAS world convention explicitly. Spaces
+loaded from a real NIfTI may additionally retain their full `affine_ras_mm` so grid
+compatibility can be validated precisely.
 
 This means:
 

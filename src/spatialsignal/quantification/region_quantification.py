@@ -5,14 +5,18 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from spatialsignal.integration.registration import LabelVolume
 from spatialsignal.models import PointCloudDataset
 
 from .atlas_regions import enrich_region_summary_with_atlas
+from .hemispheres import HEMISPHERE_NAMES, validate_hemisphere_volume
 from .instance_regions import (
     OUT_OF_BOUNDS_REGION_ID,
+    _summarize_objects_from_region_counts,
+    assign_objects_to_hemispheres,
     assign_objects_to_regions,
     remap_pointcloud_dataset_to_space,
     summarize_objects_by_region,
@@ -34,6 +38,7 @@ def quantify_objects_by_region(
     objects: PointCloudDataset,
     annotation: LabelVolume,
     *,
+    hemisphere: LabelVolume | None = None,
     ontology_preset: str = "allen_ccfv3",
     region_id_space: str = "allen",
     include_background: bool = False,
@@ -50,7 +55,9 @@ def quantify_objects_by_region(
     space as ``objects``. Object coordinates are remapped into the annotation's
     sampling grid before its region IDs are sampled. Annotation background is
     sufficient to identify non-region signal; a separate brain mask is not
-    required.
+    required. When a hemisphere map is supplied, it must use ``1 = left`` and
+    ``2 = right`` at every annotated voxel. The report then contains explicit
+    bilateral, left, and right metric columns.
     """
 
     representation = objects.metadata.representation
@@ -87,12 +94,24 @@ def quantify_objects_by_region(
         background_id=background_id,
         out_of_bounds_id=out_of_bounds_id,
     )
-    region_summary = summarize_objects_by_region(
+    if hemisphere is not None:
+        validate_hemisphere_volume(
+            hemisphere,
+            annotation,
+            background_id=background_id,
+        )
+        assigned_objects = assign_objects_to_hemispheres(
+            assigned_objects,
+            remapped_objects.space,
+            hemisphere.data,
+        )
+
+    region_summary = _summarize_object_scopes(
         assigned_objects,
-        remapped_objects.space,
-        annotation.data,
-        annotation_space=annotation.space,
-        area_measurement_space=objects.space,
+        remapped_objects,
+        objects,
+        annotation,
+        hemisphere=hemisphere,
         background_id=background_id,
         out_of_bounds_id=out_of_bounds_id,
         include_background=include_background,
@@ -122,6 +141,83 @@ def quantify_objects_by_region(
         write_region_quantification_qc(result, annotation, qc_png)
         result = replace(result, qc_png=qc_png)
     return result
+
+
+def _summarize_object_scopes(
+    assigned_objects: pd.DataFrame,
+    remapped_objects: PointCloudDataset,
+    source_objects: PointCloudDataset,
+    annotation: LabelVolume,
+    *,
+    hemisphere: LabelVolume | None,
+    background_id: int,
+    out_of_bounds_id: int,
+    include_background: bool,
+    include_out_of_bounds: bool,
+) -> pd.DataFrame:
+    """Build consistent bilateral and optional lateralized object metrics."""
+
+    bilateral = summarize_objects_by_region(
+        assigned_objects,
+        remapped_objects.space,
+        annotation.data,
+        annotation_space=annotation.space,
+        area_measurement_space=source_objects.space,
+        background_id=background_id,
+        out_of_bounds_id=out_of_bounds_id,
+        include_background=include_background,
+        include_out_of_bounds=include_out_of_bounds,
+    )
+    summary = _prefix_scope_columns(bilateral, "bilateral")
+    if hemisphere is None:
+        return summary
+
+    all_region_ids = [int(value) for value in np.unique(annotation.data)]
+    voxel_volume_space = annotation.space
+    for hemisphere_id, hemisphere_name in HEMISPHERE_NAMES.items():
+        scope_voxels = np.asarray(hemisphere.data) == hemisphere_id
+        region_counts = {
+            region_id: int(
+                np.count_nonzero(
+                    (np.asarray(annotation.data) == region_id) & scope_voxels
+                )
+            )
+            for region_id in all_region_ids
+        }
+        scope_objects = assigned_objects.loc[
+            assigned_objects["hemisphere_id"] == hemisphere_id
+        ]
+        scope_summary = _summarize_objects_from_region_counts(
+            scope_objects,
+            scope_objects["region_id"],
+            region_counts,
+            volume_space=voxel_volume_space,
+            area_measurement_space=source_objects.space,
+            background_id=background_id,
+            out_of_bounds_id=out_of_bounds_id,
+            include_background=include_background,
+            include_out_of_bounds=False,
+        )
+        scope_summary = _prefix_scope_columns(scope_summary, hemisphere_name)
+        summary = summary.merge(
+            scope_summary,
+            on="region_id",
+            how="left",
+            validate="one_to_one",
+        )
+    return summary
+
+
+def _prefix_scope_columns(summary: pd.DataFrame, scope: str) -> pd.DataFrame:
+    """Prefix all regional metrics while retaining the shared region key."""
+
+    return summary.rename(
+        columns={
+            column: f"{scope}_{column}"
+            for column in summary.columns
+            if column != "region_id"
+        }
+    )
 
 
 def _default_qc_path(summary_csv: Path) -> Path:

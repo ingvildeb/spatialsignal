@@ -1,15 +1,24 @@
+import numpy as np
 import pandas as pd
 import pytest
+import tifffile
 
 from spatialsignal.pointcloud import (
     CLEANED_OBJECT_REQUIRED_COLUMNS,
     SpaceDefinition,
     EDGE_COLUMNS,
     aggregate_cleaned_objects,
+    build_object_membership_table,
     deduplicate_across_planes,
     summarize_deduplication_result,
 )
-from spatialsignal.qc import select_qc_plane_pairs
+from spatialsignal.qc import (
+    duplicate_status_colormap,
+    read_mask_crop,
+    render_duplicate_status_mask,
+    render_duplicate_status_labels,
+    select_qc_plane_pairs,
+)
 
 
 def test_deduplicate_across_planes_builds_expected_edges_membership_and_objects() -> None:
@@ -264,6 +273,108 @@ def test_deduplicate_across_planes_max_n_planes_cap_blocks_three_plane_chain() -
     assert list(result.objects["n_planes"]) == [2, 1]
 
 
+def test_deduplicate_across_planes_rejects_indirect_same_plane_merge() -> None:
+    points = pd.DataFrame(
+        [
+            {"detection_id": 1, "seg_num": 1, "x": 100, "y": 100, "z": 10},
+            {"detection_id": 2, "seg_num": 2, "x": 103, "y": 100, "z": 10},
+            {"detection_id": 3, "seg_num": 3, "x": 101, "y": 100, "z": 11},
+        ]
+    )
+    space = SpaceDefinition(
+        space_name="subject_space",
+        orientation="las",
+        axis_labels=["x", "y", "z"],
+        indexing="zero_based",
+        units="voxel",
+        shape=[500, 500, 20],
+        resolution_um=[1.0, 1.0, 5.0],
+    )
+
+    result = deduplicate_across_planes(
+        points,
+        space,
+        max_plane_offset=1,
+        max_xy_distance_um=3.0,
+        max_n_planes=2,
+    )
+
+    expected_membership = pd.DataFrame(
+        [
+            {"object_id": 1, "detection_id": 1},
+            {"object_id": 1, "detection_id": 3},
+            {"object_id": 2, "detection_id": 2},
+        ]
+    )
+    pd.testing.assert_frame_equal(result.membership, expected_membership)
+    assert len(result.edges) == 1
+    assert (result.objects["n_detections"] == result.objects["n_planes"]).all()
+
+
+def test_component_merge_rejects_plane_overlap_created_by_separate_chains() -> None:
+    points = pd.DataFrame(
+        {
+            "detection_id": [1, 2, 3, 4],
+            "z": [10, 11, 10, 12],
+        }
+    )
+    edges = pd.DataFrame(
+        [
+            {
+                "source_detection_id": 1,
+                "target_detection_id": 2,
+                "source_z": 10,
+                "target_z": 11,
+                "plane_offset": 1,
+                "dx_um": 0.1,
+                "dy_um": 0.0,
+                "xy_distance_um": 0.1,
+                "dz_um": 5.0,
+            },
+            {
+                "source_detection_id": 3,
+                "target_detection_id": 4,
+                "source_z": 10,
+                "target_z": 12,
+                "plane_offset": 2,
+                "dx_um": 0.2,
+                "dy_um": 0.0,
+                "xy_distance_um": 0.2,
+                "dz_um": 10.0,
+            },
+            {
+                "source_detection_id": 2,
+                "target_detection_id": 4,
+                "source_z": 11,
+                "target_z": 12,
+                "plane_offset": 1,
+                "dx_um": 0.3,
+                "dy_um": 0.0,
+                "xy_distance_um": 0.3,
+                "dz_um": 5.0,
+            },
+        ],
+        columns=EDGE_COLUMNS,
+    )
+
+    membership, accepted_edges = build_object_membership_table(
+        points,
+        edges,
+        max_n_planes=3,
+    )
+
+    expected_membership = pd.DataFrame(
+        [
+            {"object_id": 1, "detection_id": 1},
+            {"object_id": 1, "detection_id": 2},
+            {"object_id": 2, "detection_id": 3},
+            {"object_id": 2, "detection_id": 4},
+        ]
+    )
+    pd.testing.assert_frame_equal(membership, expected_membership)
+    assert len(accepted_edges) == 2
+
+
 def test_summarize_deduplication_result_reports_minimal_counts() -> None:
     points = pd.DataFrame(
         [
@@ -309,3 +420,32 @@ def test_select_qc_plane_pairs_prefers_central_populated_adjacent_pairs() -> Non
     pairs = select_qc_plane_pairs(points, n_pairs=2)
 
     assert pairs == [(3, 4), (7, 8)]
+
+
+def test_read_and_render_duplicate_mask_crop(tmp_path) -> None:
+    mask = np.zeros((8, 10), dtype=np.uint16)
+    mask[2:5, 3:6] = 7
+    mask[4:7, 6:9] = 9
+    mask_path = tmp_path / "masks_plane_0001.tif"
+    tifffile.imwrite(mask_path, mask)
+
+    crop = read_mask_crop(
+        mask_path,
+        x_start=2,
+        x_end=9,
+        y_start=1,
+        y_end=7,
+    )
+    rendered = render_duplicate_status_mask(crop, {7})
+    status = render_duplicate_status_labels(crop, {7})
+    colormap = duplicate_status_colormap()
+
+    assert crop.shape == (6, 7)
+    assert tuple(rendered[2, 2]) == (0, 255, 0)
+    assert tuple(rendered[4, 5]) == (150, 25, 25)
+    assert tuple(rendered[0, 0]) == (0, 0, 0)
+    assert status[2, 2] == 2
+    assert status[4, 5] == 1
+    assert status[0, 0] == 0
+    assert tuple(colormap[:, 1]) == (65535, 0, 0)
+    assert tuple(colormap[:, 2]) == (0, 65535, 0)

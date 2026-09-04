@@ -7,9 +7,111 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import tifffile
 
 from spatialsignal.io.masks import find_mask_files
 from spatialsignal.utils.images import read_2d_mask
+
+
+def read_mask_crop(
+    mask_path: Path,
+    *,
+    x_start: int,
+    x_end: int,
+    y_start: int,
+    y_end: int,
+) -> np.ndarray:
+    """Read a half-open XY crop from a 2D mask without loading a full TIFF.
+
+    Uncompressed TIFF masks are memory-mapped so whole-brain label images can
+    contribute small QC crops without allocating the complete image. Other
+    supported image formats fall back to the shared 2D mask reader.
+    """
+
+    bounds = (x_start, x_end, y_start, y_end)
+    if any(not isinstance(value, (int, np.integer)) for value in bounds):
+        raise TypeError("Mask crop bounds must be integers")
+    if x_start < 0 or y_start < 0 or x_end <= x_start or y_end <= y_start:
+        raise ValueError(
+            "Mask crop bounds must be non-negative half-open intervals, got "
+            f"x=[{x_start}, {x_end}), y=[{y_start}, {y_end})"
+        )
+
+    mask: np.ndarray
+    if mask_path.suffix.lower() in {".tif", ".tiff"}:
+        try:
+            mask = tifffile.memmap(mask_path)
+        except (OSError, ValueError, tifffile.TiffFileError):
+            mask = read_2d_mask(mask_path)
+    else:
+        mask = read_2d_mask(mask_path)
+    if mask.ndim != 2:
+        raise ValueError(f"Expected a 2D mask at {mask_path}, got shape {mask.shape}")
+    height, width = mask.shape
+    if x_end > width or y_end > height:
+        raise ValueError(
+            f"Mask crop x=[{x_start}, {x_end}), y=[{y_start}, {y_end}) exceeds "
+            f"mask shape {mask.shape} at {mask_path}"
+        )
+    return np.array(mask[y_start:y_end, x_start:x_end], copy=True)
+
+
+def render_duplicate_status_mask(
+    mask: np.ndarray,
+    duplicate_seg_nums: np.ndarray | list[int] | set[int],
+    *,
+    duplicate_color_rgb: tuple[int, int, int] = (0, 255, 0),
+    nonduplicate_color_rgb: tuple[int, int, int] = (150, 25, 25),
+) -> np.ndarray:
+    """Color linked mask instances green and unlinked instances muted red."""
+
+    for name, color in (
+        ("duplicate_color_rgb", duplicate_color_rgb),
+        ("nonduplicate_color_rgb", nonduplicate_color_rgb),
+    ):
+        if len(color) != 3 or any(value < 0 or value > 255 for value in color):
+            raise ValueError(f"{name} must contain three values in [0, 255], got {color}")
+
+    labels = render_duplicate_status_labels(mask, duplicate_seg_nums)
+    colors = np.asarray(
+        [(0, 0, 0), nonduplicate_color_rgb, duplicate_color_rgb],
+        dtype=np.uint8,
+    )
+    return colors[labels]
+
+
+def render_duplicate_status_labels(
+    mask: np.ndarray,
+    duplicate_seg_nums: np.ndarray | list[int] | set[int],
+) -> np.ndarray:
+    """Return 0=background, 1=unlinked, and 2=linked instance labels."""
+
+    mask = np.asarray(mask)
+    if mask.ndim != 2:
+        raise ValueError(f"Expected a 2D mask, got shape {mask.shape}")
+    status = np.zeros(mask.shape, dtype=np.uint8)
+    foreground = mask != 0
+    status[foreground] = 1
+    duplicates = np.isin(mask, np.asarray(list(duplicate_seg_nums), dtype=mask.dtype))
+    status[duplicates & foreground] = 2
+    return status
+
+
+def duplicate_status_colormap(
+    *,
+    duplicate_color_rgb: tuple[int, int, int] = (0, 255, 0),
+    nonduplicate_color_rgb: tuple[int, int, int] = (255, 0, 0),
+) -> np.ndarray:
+    """Return a TIFF palette for duplicate-status label images."""
+
+    colors = ((0, 0, 0), nonduplicate_color_rgb, duplicate_color_rgb)
+    for color in colors:
+        if len(color) != 3 or any(value < 0 or value > 255 for value in color):
+            raise ValueError(f"RGB colors must contain values in [0, 255], got {color}")
+    colormap = np.zeros((3, 256), dtype=np.uint16)
+    for index, color in enumerate(colors):
+        colormap[:, index] = np.asarray(color, dtype=np.uint16) * 257
+    return colormap
 
 
 def select_qc_plane_pairs(
@@ -191,12 +293,12 @@ def _color_single_plane_mask(
     duplicate_seg_nums = plane_rows.loc[
         plane_rows["object_id"].isin(pair_object_ids), "seg_num"
     ].astype(mask.dtype).to_numpy()
-    all_seg_nums = plane_rows["seg_num"].astype(mask.dtype).to_numpy()
-    nonduplicate_seg_nums = np.setdiff1d(all_seg_nums, duplicate_seg_nums, assume_unique=False)
 
-    rgb = np.zeros(mask.shape + (3,), dtype=np.uint8)
-    rgb[np.isin(mask, nonduplicate_seg_nums)] = (255, 0, 0)
-    rgb[np.isin(mask, duplicate_seg_nums)] = (0, 255, 0)
+    rgb = render_duplicate_status_mask(
+        mask,
+        duplicate_seg_nums,
+        nonduplicate_color_rgb=(255, 0, 0),
+    )
     tifffile.imwrite(output_path, rgb)
 
     return {

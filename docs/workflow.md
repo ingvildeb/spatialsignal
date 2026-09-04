@@ -35,6 +35,13 @@ grid, indexing convention, representation type, and provenance.
 `deduplicate_across_planes()` links nearby detections in adjacent planes and
 aggregates them into biological objects. `save_deduplication_outputs()` writes:
 
+Candidate relationships are considered from shortest to longest XY distance.
+An edge is accepted only when the two components do not already contain
+detections from any shared plane. Consequently, every cleaned object contains
+at most one detection per plane, including when several cross-plane edges form
+an indirect chain. `max_n_planes` separately limits the number of distinct
+planes represented by an object.
+
 - `<subject>_objects.parquet`
 - `<subject>_objects_space.json`
 - `<subject>_object_membership.parquet`
@@ -66,20 +73,25 @@ package does not silently discard or force-resolve them.
 
 ### 3. Quantify objects by region
 
-The registration integration layer consumes an `atlasspace` output folder and
-loads its subject-space warped annotation. A separate brain mask is not needed
-for region quantification: annotation background is excluded from the report by
-default, while out-of-bounds objects remain available as a QC row.
+The registration integration layer consumes the canonical
+`registration_result.json` in an `atlasspace` output folder and exposes its
+resolved `transformed_segmentations` mapping. The project selects the desired
+segmentation key and loads it with the generic `load_label_volume()` function.
+A separate brain mask is not needed for region quantification: annotation
+background is excluded from the report by default, while out-of-bounds objects
+remain available as a QC row.
 
 `quantify_objects_by_region()` then:
 
 1. remaps cleaned-object coordinates from the native mask grid into the
    annotation grid
 2. assigns one region ID to each object
-3. summarizes counts, region volume, density, median object area, and median
-   object eccentricity
-4. uses `atlaslevels` to add canonical Allen IDs, acronyms, names, and colors
-5. optionally writes the compact region report as CSV together with its visual
+3. optionally samples a registered BrainGlobe-convention hemisphere map
+   (`1 = left`, `2 = right`) for every object
+4. summarizes bilateral and lateralized counts, region volume, density, median
+   object area, and median object eccentricity
+5. uses `atlaslevels` to add canonical Allen IDs, acronyms, names, and colors
+6. optionally writes the compact region report as CSV together with its visual
    QC PNG
 
 The returned `RegionQuantificationResult` retains the remapped object dataset,
@@ -97,6 +109,13 @@ The primary outputs are:
 
 Subject-space regional summaries are the canonical biological quantitative
 outputs.
+
+`quantify_signal_by_region()` provides the corresponding operation for binary
+semantic masks and fractional-occupancy maps already sampled on the annotation
+grid. It reports integrated signal volume and signal fraction per atlas region,
+with explicit bilateral, left, and right columns when the same hemisphere map is
+provided. Analysis-domain decisions remain the responsibility of the project that
+constructs the input signal map.
 
 ### Optional hierarchy-level summaries
 
@@ -169,10 +188,9 @@ The MATLAB CSV is a validation and compatibility format, not the canonical
 
 ## Reference-Space Outputs
 
-Reference-space maps are planned primarily for aligned visualization and
-cross-subject comparison. The intended instance workflow is to transform
-deduplicated objects into the reference space, voxelize them there, and then
-derive any smoothed or boundary-corrected visualization representation.
+Reference-space transformation is currently deferred. Transform direction,
+coordinate conventions, count conservation, and the output contract require
+dedicated validation before a production API is added.
 
 An unmodulated aligned point map is not automatically a native-density-preserving
 map after nonlinear deformation. Jacobian-adjusted representations therefore
