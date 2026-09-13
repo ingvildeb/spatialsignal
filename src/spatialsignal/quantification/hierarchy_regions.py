@@ -175,11 +175,14 @@ def _map_to_hierarchy_parent(
             f"namespace for hierarchy preset {bundle.family_name!r}"
         )
 
-    parent_id = bundle.map_region_to_level_parent(
-        allen_region_id,
-        hierarchy_level,
-        include_parent_residual=True,
-    )
+    parent_id = bundle.map_region_to_level_parent(allen_region_id, hierarchy_level)
+    if parent_id is None:
+        level_parent_ids = bundle.get_parent_ids(hierarchy_level)
+        if any(
+            bundle.ontology.is_descendant(level_parent_id, allen_region_id)
+            for level_parent_id in level_parent_ids
+        ):
+            parent_id = allen_region_id
     if parent_id is None:
         raise ValueError(
             f"Region ID {source_region_id!r} does not map to hierarchy level "

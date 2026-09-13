@@ -138,13 +138,13 @@ def test_hierarchy_summary_recomputes_parent_metrics_from_objects_and_volume() -
         assigned_objects,
         space,
         annotation,
-        hierarchy_preset="allen_gm_tiny",
-        hierarchy_level="allen_gm_tiny_level_2",
+        hierarchy_preset="allen_gm",
+        hierarchy_level="CustomLevel1_gm",
         region_id_space="allen",
     )
 
     parent = summary.loc[summary["region_id"] == 184].iloc[0]
-    assert parent["hierarchy_preset"] == "allen_gm_tiny"
+    assert parent["hierarchy_preset"] == "allen_gm"
     assert parent["is_parent_residual"] == False
     assert "hierarchy_level" not in summary.columns
     assert "source_region_id_space" not in summary.columns

@@ -13,7 +13,10 @@ def parse_args() -> argparse.Namespace:
     """Parse command-line arguments for point-cloud building."""
 
     parser = argparse.ArgumentParser(
-        description="Build a canonical detection_id,seg_num,x,y,z point-cloud CSV from Cellpose masks."
+        description=(
+            "Build a canonical detection_id,seg_num,x,y,z point-cloud Parquet "
+            "table from labeled instance masks."
+        )
     )
     parser.add_argument(
         "--config",
@@ -24,7 +27,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
-    """Build a point-cloud CSV from a directory of Cellpose masks."""
+    """Build a point-cloud dataset from a directory of labeled instance masks."""
 
     args = parse_args()
     config = load_toml_config(Path(args.config))

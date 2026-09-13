@@ -1,7 +1,8 @@
 # Roadmap
 
-This internal document tracks development status and planned work for
-`spatialsignal`. The public package overview lives in the repository README.
+This document tracks development status and planned work for `spatialsignal`.
+The package overview and supported public interface live in the repository
+README.
 
 ## Settled Direction
 

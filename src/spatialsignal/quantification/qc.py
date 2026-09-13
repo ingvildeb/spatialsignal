@@ -39,7 +39,8 @@ def write_region_quantification_qc(
     """
 
     try:
-        import matplotlib.pyplot as plt
+        from matplotlib.backends.backend_agg import FigureCanvasAgg
+        from matplotlib.figure import Figure
     except ImportError as exc:  # pragma: no cover - depends on optional install
         raise ImportError(
             "Visual quantification QC requires the spatialsignal matplotlib dependency."
@@ -87,7 +88,9 @@ def write_region_quantification_qc(
     foreground = np.asarray(annotation.data) != background_id
     slice_indices = _representative_slice_indices(indices, in_bounds, shape)
 
-    figure, axes = plt.subplots(2, 3, figsize=(18, 11), constrained_layout=True)
+    figure = Figure(figsize=(18, 11), constrained_layout=True)
+    FigureCanvasAgg(figure)
+    axes = figure.subplots(2, 3)
     orientation = annotation.space.orientation.lower()
     for column, (horizontal_axis, vertical_axis, collapsed_axis) in enumerate(
         plane_specs
@@ -191,7 +194,6 @@ def write_region_quantification_qc(
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     figure.savefig(output_path, dpi=dpi, facecolor="white")
-    plt.close(figure)
     return output_path
 
 

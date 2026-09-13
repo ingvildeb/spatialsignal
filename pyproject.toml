@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,9 +8,30 @@ version = "0.1.0"
 description = "Spatial point-cloud and mapping toolkit for whole-brain segmented cells"
 readme = "README.md"
 requires-python = ">=3.10"
-license = { file = "LICENSE" }
+license = "GPL-3.0-only"
+license-files = ["LICENSE"]
 authors = [
-  { name = "Christine Mun" },
+  { name = "Ingvild Bjerke" },
+]
+keywords = [
+  "atlas",
+  "image-analysis",
+  "light-sheet-microscopy",
+  "neuroscience",
+  "point-cloud",
+  "segmentation",
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering :: Bio-Informatics",
+  "Topic :: Scientific/Engineering :: Image Processing",
 ]
 dependencies = [
   "atlaslevels>=0.3.0",
@@ -31,8 +52,15 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+  "build>=1.2",
   "pytest>=8.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/ingvildeb/spatialsignal"
+Documentation = "https://github.com/ingvildeb/spatialsignal/tree/main/docs"
+Issues = "https://github.com/ingvildeb/spatialsignal/issues"
+Repository = "https://github.com/ingvildeb/spatialsignal.git"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

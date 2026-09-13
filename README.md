@@ -1,286 +1,107 @@
 # spatialsignal
 
-`spatialsignal` is a reusable Python package for deriving and analysing spatial
-representations from instance or semantic segmentations produced by light-sheet
-fluorescence microscopy workflows.
+[![CI](https://github.com/ingvildeb/spatialsignal/actions/workflows/ci.yml/badge.svg)](https://github.com/ingvildeb/spatialsignal/actions/workflows/ci.yml)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
+[![License: GPL v3](https://img.shields.io/badge/license-GPL--3.0--only-blue.svg)](LICENSE)
 
-This is an early-stage, pre-1.0 release. The core data models and workflows are
-in place, but some APIs may still evolve as the package is tested in real use.
+`spatialsignal` is a Python package for turning instance and semantic
+segmentations from light-sheet fluorescence microscopy into explicit,
+analysis-ready spatial datasets. It builds point clouds, resolves repeated
+detections across planes, creates subject-space voxel maps, and quantifies
+segmented objects or signal by atlas region.
 
-`spatialsignal` currently supports:
+The package keeps coordinate conventions, grid geometry, data meaning, and
+processing provenance alongside every canonical output. This makes spatial
+tables and arrays safer to exchange between segmentation, registration, and
+analysis workflows.
 
-- centroid point clouds from labeled instance-segmentation masks
-- dense signal-support point tables from binary semantic masks
-- cross-plane deduplication of repeated detections
-- exact-plane, one-to-one colocalization matching between centroid point clouds
-- subject-space voxelization into count maps and fraction maps
-- subject-space object-to-region assignment with atlas names, counts, densities, and 2D morphology measurements
-- optional hierarchy-level instance summaries using curated `atlaslevels` bundles
-- explicit metadata sidecars describing space, representation, and processing
-- validation against legacy MATLAB centroid CSV outputs (relevant for Kim lab members)
+> [!NOTE]
+> `spatialsignal` is early-stage, pre-1.0 software. The main data models and
+> workflows are in place, but APIs may evolve as validation expands.
 
-Large tables are stored as Parquet to preserve dtypes and support efficient
-programmatic reads. Compact per-region summaries remain CSV for easy inspection.
-Spatial metadata and provenance are stored in JSON sidecars.
+## Workflow at a glance
 
-## Core concepts
-
-### Spatial metadata
-
-`SpaceDefinition` describes the voxel grid occupied by a spatial dataset. It
-keeps together:
-
-- a three-letter anatomical orientation, such as `las`
-- axis labels and whether voxel indices are zero- or one-based
-- the grid shape
-- voxel resolution in microns
-- a human-readable space name
-
-For example, define the native space occupied by a subject's segmentation
-masks:
-
-```python
-from spatialsignal.models import SpaceDefinition
-
-native_space = SpaceDefinition(
-    space_name="subject_001_native",
-    orientation="las",
-    axis_labels=["x", "y", "z"],
-    indexing="zero_based",
-    units="voxel",
-    shape=[640, 400, 580],
-    resolution_um=[1.8, 1.8, 20.0],
-)
+```mermaid
+flowchart LR
+    A[Labeled instance masks] --> B[Centroid point cloud]
+    B --> C[Cross-plane deduplication]
+    C --> D[Subject-space count map]
+    C --> E[Atlas-region summaries]
+    F[Binary semantic masks] --> G[Subject-space fraction map]
+    G --> H[Atlas-region summaries]
 ```
 
-Coordinates and arrays use `x, y, z` order throughout the package. Keeping the
-orientation, indexing convention, shape, and resolution explicit prevents a
-table or array from being interpreted in the wrong grid.
+Current capabilities include:
 
-### Dataset metadata
-
-`DatasetMetadata` combines a `SpaceDefinition` with two other pieces of
-information:
-
-- `DataRepresentation` describes what the data mean, such as raw centroid
-  detections, cleaned objects, a count map, or a signal fraction map.
-- `ProcessingProvenance` records the stage, source, parameters, and a compact
-  processing summary when applicable.
-
-This metadata is written beside each canonical data file as JSON. The sidecar
-is part of the dataset contract rather than optional documentation.
-
-Continuing with `native_space`, describe a raw centroid table and how it was
-produced:
-
-```python
-from pathlib import Path
-
-from spatialsignal.models import (
-    DataRepresentation,
-    DatasetMetadata,
-    ProcessingProvenance,
-)
-
-metadata = DatasetMetadata(
-    schema_name="spatialsignal.dataset_metadata",
-    schema_version="0.1.0",
-    space=native_space,
-    representation=DataRepresentation(
-        kind="point_cloud",
-        representation_type="point_centroids",
-    ),
-    processing=ProcessingProvenance(
-        stage="extract_centroids",
-        source_name="masks/subject_001",
-        parameters={"indexing": "zero_based"},
-        summary={"n_detections": 3},
-    ),
-)
-
-metadata.to_json(Path("outputs/subject_001_pointcloud_space.json"))
-```
-
-The representation says what the values mean, while the processing record says
-where they came from. Both travel with the spatial definition in the saved
-sidecar.
-
-### Point clouds
-
-`PointCloudDataset` keeps a pandas point table together with its metadata and
-subject identity. It provides validation for the required columns, coordinate
-bounds, indexing convention, and declared space.
-
-The main point representations are:
-
-- `point_centroids`: one raw centroid detection per labeled 2D instance
-- `cleaned_objects`: detections believed to represent the same object across
-  adjacent planes, merged into one object
-- `signal_points`: every foreground voxel represented by binary semantic masks
-
-Continuing with the `metadata` above, combine a small centroid table with its
-subject identity and metadata:
-
-```python
-import pandas as pd
-
-from spatialsignal.models import PointCloudDataset
-
-points = pd.DataFrame(
-    {
-        "detection_id": [1, 2, 3],
-        "seg_num": [14, 8, 21],
-        "x": [120, 305, 410],
-        "y": [85, 190, 250],
-        "z": [12, 12, 13],
-    }
-)
-
-dataset = PointCloudDataset(
-    subject_name="subject_001",
-    points=points,
-    metadata=metadata,
-)
-dataset.validate()
-
-print(dataset.summary())
-```
-
-For canonical files written by `spatialsignal`, load the Parquet table and JSON
-sidecar together:
-
-```python
-from pathlib import Path
-
-dataset = PointCloudDataset.from_files(
-    table_path=Path("outputs/subject_001_pointcloud.parquet"),
-    json_path=Path("outputs/subject_001_pointcloud_space.json"),
-)
-dataset.validate()
-```
-
-### Voxel maps
-
-`VoxelMap` keeps a three-dimensional NumPy array together with the same
-metadata contract. Its in-memory array order is `data[x, y, z]`.
-
-Instance centroids or cleaned objects become count maps, where each value is
-the number of objects assigned to an analysis voxel. Binary semantic masks
-become fraction maps, where each value is the fraction of native voxels
-containing signal within an analysis voxel. These representations should not be
-treated as interchangeable.
-
-For example, derive a coarser grid from `native_space` and construct a small
-count map in that analysis space:
-
-```python
-import numpy as np
-
-from spatialsignal.models import (
-    DataRepresentation,
-    DatasetMetadata,
-    ProcessingProvenance,
-    VoxelMap,
-)
-from spatialsignal.voxelization import make_subject_analysis_space
-
-analysis_space = make_subject_analysis_space(
-    native_space,
-    analysis_resolution_um=[20.0, 20.0, 20.0],
-    space_name="subject_001_analysis",
-)
-
-counts = np.zeros(tuple(analysis_space.shape), dtype=np.uint32)
-counts[10, 15, 20] = 3
-counts[11, 15, 20] = 1
-
-count_metadata = DatasetMetadata(
-    schema_name="spatialsignal.dataset_metadata",
-    schema_version="0.1.0",
-    space=analysis_space,
-    representation=DataRepresentation(
-        kind="voxel_map",
-        representation_type="count_map",
-        value_units="objects_per_voxel",
-    ),
-    processing=ProcessingProvenance(
-        stage="voxelize_to_space",
-        source_name="subject_001_objects.parquet",
-        summary={"input_points": 4, "total_count": 4},
-    ),
-)
-
-count_map = VoxelMap(
-    subject_name="subject_001",
-    data=counts,
-    metadata=count_metadata,
-)
-
-print(count_map.summary())
-```
-
-In normal workflows, `voxelize_to_space` or
-`voxelize_signal_masks_to_fraction_map` constructs this model and its metadata
-automatically. The explicit example shows how the array, spatial grid, data
-meaning, and processing history fit together.
-
-### Subject space and reference space
-
-The canonical quantitative outputs remain in subject space. A subject analysis
-space may use a coarser resolution than the native segmentation while retaining
-the same physical extent and orientation.
-
-Reference-space maps are useful for visualization and cross-subject comparison,
-but they are derived products rather than the primary source of truth for
-biological quantification. Atlas-aware region quantification instead samples an
-annotation volume that has been transformed into the subject's space.
-
-## Package scope
-
-`spatialsignal` is intended to work alongside other packages in the LSFM
-analysis ecosystem:
-
-- `atlasspace` owns template averaging, registration, transforms, and registration output folders
-- `atlaslevels` owns atlas hierarchy and region metadata
-- `spatialsignal` owns segmentation-derived spatial representations such as point clouds, cleaned object tables, count maps, and semantic fraction maps
+- centroid extraction from labeled 2D instance-mask stacks;
+- dense signal-support extraction from binary semantic masks;
+- cross-plane deduplication with auditable membership and edge tables;
+- exact-plane, one-to-one colocalization between centroid point clouds;
+- count, density, and fractional-occupancy maps in subject space;
+- atlas-region assignment and bilateral or hemisphere-aware summaries;
+- area and eccentricity summaries for 2D instance detections;
+- optional atlas hierarchy rollups through
+  [`atlaslevels`](https://github.com/ingvildeb/atlaslevels);
+- Parquet tables, NIfTI or NumPy maps, JSON metadata sidecars, and visual QC.
 
 ## Installation
 
-`spatialsignal` is written for Python 3.10+.
-
-Install in editable mode from the repository root:
-
-```bash
-pip install -e .
-```
-
-For development extras:
+`spatialsignal` requires Python 3.10 or newer. Until a PyPI release is
+available, install directly from GitHub:
 
 ```bash
-pip install -e ".[dev]"
+python -m pip install "spatialsignal @ git+https://github.com/ingvildeb/spatialsignal.git@main"
 ```
 
-## Example instance-segmentation workflow
+For local development:
 
-The following examples build on one another to turn a stack of labeled 2D
-instance masks into a validated point cloud, cleaned objects, and a subject-space
-count map.
+```bash
+git clone https://github.com/ingvildeb/spatialsignal.git
+cd spatialsignal
+python -m pip install -e ".[dev]"
+```
 
-### Build a centroid point cloud
+## Quick start
 
-Each nonzero instance label in each mask becomes one centroid detection:
+The repository includes a self-contained example that generates a tiny mask
+stack, extracts four detections, merges them into two objects, and writes a
+subject-space count map:
+
+```bash
+python examples/quickstart.py --out-dir quickstart-output
+```
+
+The example creates:
+
+```text
+quickstart-output/
+  masks/
+  results/
+    example_subject_pointcloud.parquet
+    example_subject_pointcloud_space.json
+    example_subject_objects.parquet
+    example_subject_objects_space.json
+    example_subject_object_membership.parquet
+    example_subject_count_map.npy
+    example_subject_count_map.nii.gz
+    example_subject_count_map_space.json
+```
+
+Each computational table or map is paired with a JSON sidecar describing its
+space, representation, and processing history.
+
+## Instance-segmentation example
+
+Each nonzero label in each input mask becomes one centroid detection:
 
 ```python
 from pathlib import Path
 
 from spatialsignal.pointcloud import build_pointcloud_from_masks
 
-mask_dir = Path("masks/subject_001")
-out_dir = Path("outputs")
-
 build_pointcloud_from_masks(
-    mask_dir=mask_dir,
-    out_dir=out_dir,
+    mask_dir=Path("masks/subject_001"),
+    out_dir=Path("outputs"),
     subject_name="subject_001",
     space_name="subject_001_native",
     orientation="las",
@@ -290,17 +111,8 @@ build_pointcloud_from_masks(
 )
 ```
 
-This writes `subject_001_pointcloud.parquet` and its matching
-`subject_001_pointcloud_space.json` sidecar. The stack dimensions are inferred
-from the mask files.
-
-Use `max_workers=1` in notebooks and other interactive sessions. On Windows,
-keep calls with `max_workers > 1` under `if __name__ == "__main__":`.
-
-### Merge repeated detections across planes
-
-Load the point cloud and merge nearby detections that likely represent the same
-object in adjacent sections:
+Load the table and its sidecar together, then merge plausible detections from
+adjacent planes:
 
 ```python
 from spatialsignal.io import save_deduplication_outputs
@@ -308,8 +120,8 @@ from spatialsignal.models import PointCloudDataset
 from spatialsignal.pointcloud import deduplicate_across_planes
 
 dataset = PointCloudDataset.from_files(
-    table_path=out_dir / "subject_001_pointcloud.parquet",
-    json_path=out_dir / "subject_001_pointcloud_space.json",
+    table_path=Path("outputs/subject_001_pointcloud.parquet"),
+    json_path=Path("outputs/subject_001_pointcloud_space.json"),
 )
 dataset.validate()
 
@@ -320,320 +132,145 @@ result = deduplicate_across_planes(
     max_xy_distance_um=3.0,
     max_n_planes=2,
 )
-
-dedup_paths = save_deduplication_outputs(dataset, result, out_dir)
-print(f"{len(dataset.points)} detections -> {len(result.objects)} objects")
+save_deduplication_outputs(dataset, result, Path("outputs"))
 ```
 
-`result` contains the cleaned object table, the raw-detection membership table,
-and the accepted cross-plane edges. The saved object sidecar also records the
-deduplication parameters and summary. Candidate edges are evaluated from
-shortest to longest XY distance, and a component merge is rejected if the two
-components already contain detections from any shared plane. Every cleaned
-object therefore contains at most one detection per plane. `max_n_planes`
-places an additional cap on the number of distinct planes represented.
+Use `max_workers=1` in notebooks and other interactive sessions. On Windows,
+calls with `max_workers > 1` must run under `if __name__ == "__main__":`.
 
-For morphology-preserving deduplication QC, `spatialsignal.qc` provides the
-original pairwise red/green mask writer plus crop-level building blocks:
-`read_mask_crop` memory-maps small regions from large TIFF masks, and
-`render_duplicate_status_mask` colors linked instances green and unlinked
-instances red. These helpers allow parameter sweeps to compare the same source
-planes and XY crop without allocating or writing full-brain RGB masks.
-`render_duplicate_status_labels` and `duplicate_status_colormap` provide an
-ImageJ-compatible indexed-color representation for full-resolution TIFF QC:
-0 is black background, 1 is red unlinked signal, and 2 is green linked signal.
+## Atlas-aware quantification
 
-### Voxelize cleaned objects
-
-Create a coarser analysis grid covering the same subject and aggregate one count
-per cleaned object:
-
-```python
-from spatialsignal.io import save_voxel_map_outputs
-from spatialsignal.voxelization import make_subject_analysis_space, voxelize_to_space
-
-objects = PointCloudDataset.from_files(
-    table_path=dedup_paths.objects_table,
-    json_path=dedup_paths.objects_json,
-    subject_name="subject_001",
-)
-
-analysis_space = make_subject_analysis_space(
-    objects.space,
-    analysis_resolution_um=[20.0, 20.0, 20.0],
-    space_name="subject_001_analysis",
-)
-count_map = voxelize_to_space(objects, analysis_space)
-count_paths = save_voxel_map_outputs(
-    count_map,
-    out_dir,
-    name_suffix="count_map",
-    formats=("nifti",),
-)
-
-print(count_map.summary())
-print(count_paths.nifti_path)
-```
-
-## Example semantic-segmentation workflow
-
-For binary semantic masks, voxelize the masks directly into a fraction map. This
-avoids materializing a potentially very large signal-point table:
+`spatialsignal` assigns cleaned objects or semantic signal to an annotation
+volume already transformed into subject space. It does not perform
+registration itself.
 
 ```python
 from pathlib import Path
 
-from spatialsignal.io import find_mask_files, save_voxel_map_outputs
-from spatialsignal.models import SpaceDefinition
-from spatialsignal.voxelization import (
-    make_subject_analysis_space,
-    voxelize_signal_masks_to_fraction_map,
+from spatialsignal.integration import (
+    load_atlasspace_registration_folder,
+    load_label_volume,
 )
-
-mask_files = find_mask_files(Path("masks/subject_001_signal"))
-native_space = SpaceDefinition.from_mask_files(
-    space_name="subject_001_native",
-    orientation="las",
-    resolution_um=[1.8, 1.8, 20.0],
-    indexing="zero_based",
-    mask_files=mask_files,
-)
-analysis_space = make_subject_analysis_space(
-    native_space,
-    analysis_resolution_um=[20.0, 20.0, 20.0],
-    space_name="subject_001_analysis",
-)
-fraction_map = voxelize_signal_masks_to_fraction_map(
-    mask_files,
-    native_space,
-    analysis_space,
-    subject_name="subject_001",
-)
-fraction_paths = save_voxel_map_outputs(
-    fraction_map,
-    Path("outputs"),
-    name_suffix="fraction_map",
-    formats=("nifti",),
-)
-
-print(fraction_map.summary())
-print(fraction_paths.nifti_path)
-```
-
-## Atlas-aware region quantification
-
-Cleaned objects can be assigned to a subject-space annotation produced by an
-`atlasspace` registration. Region summaries retain the annotation's original
-`region_id` and can be enriched with canonical Allen IDs, acronyms, names, and
-colors through `atlaslevels`.
-
-Start from the cleaned-object table written by the deduplication workflow, then
-load the subject-space annotation and build one summary row per atlas region:
-
-```python
-from pathlib import Path
-
-from spatialsignal.integration import load_label_volume
 from spatialsignal.models import PointCloudDataset
 from spatialsignal.quantification import quantify_objects_by_region
 
 objects = PointCloudDataset.from_files(
     table_path=Path("outputs/subject_001_objects.parquet"),
     json_path=Path("outputs/subject_001_objects_space.json"),
-    subject_name="subject_001",
 )
-
-annotation = load_label_volume(
-    Path("outputs/subject_001_registration/annotation_WarpedSegmentation.nii.gz")
-)
-hemisphere = load_label_volume(
-    Path("outputs/subject_001_registration/hemispheres_WarpedSegmentation.nii.gz"),
+registration = load_atlasspace_registration_folder("subject_001_registration")
+annotation = load_label_volume(registration.transformed_segmentations["labels"])
+hemispheres = load_label_volume(
+    registration.transformed_segmentations["hemispheres"],
     space_name=annotation.space.space_name,
 )
 
 result = quantify_objects_by_region(
     objects,
     annotation,
-    hemisphere=hemisphere,
+    hemisphere=hemispheres,
     ontology_preset="allen_ccfv3",
-    region_id_space="kimlab16bit",  # Use "allen" for an Allen-ID annotation.
+    region_id_space="allen",
     output_csv=Path("outputs/subject_001_region_summary.csv"),
 )
-
-print(result.assigned_objects["assignment_status"].value_counts())
-print(
-    result.region_summary[
-        [
-            "region_acronym",
-            "region_name",
-            "bilateral_object_count",
-            "left_object_count",
-            "right_object_count",
-        ]
-    ]
-)
-print(result.summary_csv)
-print(result.qc_png)
 ```
 
-`load_label_volume` reads the annotation array and derives its sampling grid
-from the NIfTI shape and affine. Here, the annotation has already been
-transformed into subject space by `atlasspace`; loading the surrounding
-registration folder is not required. Its optional `space_name` is only a
-provenance label and defaults to the NIfTI filename stem.
+The annotation supplies region identities; an optional hemisphere volume adds
+left, right, and bilateral measurements. Hemisphere IDs follow the BrainGlobe
+convention: `1 = left` and `2 = right`.
 
-When starting from an AtlasSpace output folder, the generic registration loader
-reads the canonical `registration_result.json` manifest and resolves every
-declared segmentation path:
+The registration-folder loader consumes the public manifest contract produced
+by [`atlasspace`](https://github.com/ingvildeb/atlasspace). Direct NIfTI loading
+also works when no registration folder is available.
 
-```python
-from spatialsignal.integration import load_atlasspace_registration_folder
+## Spatial data contract
 
-registration = load_atlasspace_registration_folder("subject_001_registration")
-annotation = load_label_volume(registration.transformed_segmentations["labels"])
-hemisphere = load_label_volume(
-    registration.transformed_segmentations["hemispheres"],
-    space_name=annotation.space.space_name,
-)
+Coordinates and in-memory arrays use `x, y, z` axis order. A
+`SpaceDefinition` records:
+
+- anatomical orientation, such as `las`;
+- axis labels and zero- or one-based indexing;
+- grid shape and voxel resolution in microns;
+- a human-readable space name.
+
+`DatasetMetadata` adds the representation type and processing provenance.
+Canonical JSON sidecars are part of the dataset rather than optional notes.
+Point tables should not be interpreted without their matching sidecars.
+
+Subject-space outputs are the quantitative source of truth. Reference-space
+maps may be derived for visualization and cross-subject comparison, while
+regional quantification samples an atlas annotation transformed into each
+subject's space.
+
+See [Coordinate systems](docs/coordinate_systems.md) for the complete axis,
+indexing, remapping, and NIfTI conventions.
+
+## Outputs
+
+| Representation | Primary format | Meaning |
+| --- | --- | --- |
+| Raw detections | Parquet + JSON | One centroid per labeled 2D instance |
+| Cleaned objects | Parquet + JSON | Cross-plane detections merged into objects |
+| Signal points | Parquet + JSON | Foreground voxels from semantic masks |
+| Count or density map | NIfTI/NumPy + JSON | Instance-derived values on an analysis grid |
+| Fraction map | NIfTI/NumPy + JSON | Semantic occupancy on an analysis grid |
+| Region summary | CSV | Atlas-enriched regional measurements |
+
+Large computational tables use Parquet to preserve data types and support
+efficient reads. Compact regional summaries remain CSV for straightforward
+inspection.
+
+## Examples and documentation
+
+Runnable examples under `examples/` cover:
+
+- point-cloud and signal-point construction;
+- cross-plane deduplication and its pairwise QC;
+- point-cloud colocalization;
+- point and semantic-mask voxelization;
+- atlas-region quantification;
+- config scaffolding and legacy-output validation.
+
+Detailed guides:
+
+- [Workflows](docs/workflow.md): supported pipelines and package boundaries
+- [Coordinate systems](docs/coordinate_systems.md): spatial and map conventions
+- [Legacy MATLAB relationship](docs/legacy_matlab_relationship.md): optional compatibility notes
+- [Roadmap](docs/roadmap.md): completed work and planned research lanes
+- [Contributing](CONTRIBUTING.md): development setup and pull-request guidance
+
+## Ecosystem scope
+
+`spatialsignal` is designed to interoperate with focused packages in the LSFM
+analysis ecosystem:
+
+- `atlasspace` owns registration, transforms, and registration outputs;
+- `atlaslevels` owns atlas ontologies, hierarchy definitions, and ID mapping;
+- `spatialsignal` owns segmentation-derived point datasets, voxel maps, and
+  subject-space quantification.
+
+Keeping these responsibilities separate prevents project-specific
+orchestration from becoming part of the reusable spatial API.
+
+## Development
+
+Install the development dependencies and run the test suite:
+
+```bash
+python -m pip install -e ".[dev]"
+python -m pytest -q
+python -m build
 ```
 
-Segmentation names have no built-in meaning to SpatialSignal. Annotations,
-hemisphere maps, brain masks, and future label volumes all follow this same path.
-Legacy `registration_summary.txt` files are not used.
+See [CONTRIBUTING.md](CONTRIBUTING.md) before proposing a substantial change.
 
-`quantify_objects_by_region` expresses the cleaned-object coordinates in its
-sampling grid, assigns region and hemisphere IDs, adds atlas names, and returns
-both the object-level assignments and regional summary. Hemisphere maps use the
-BrainGlobe convention `1 = left` and `2 = right`; every annotated voxel must be
-assigned. The summary reports bilateral, left, and right columns without changing
-the atlas region IDs. Passing `output_csv` also writes the summary to the requested
-CSV path and automatically writes the matching
-`subject_001_quantification_qc.png`.
+## Citation
 
-Objects sampling annotation ID `0` remain in `result.assigned_objects` with
-`assignment_status == "background"`, but background is excluded from
-`result.region_summary` by default. The annotation therefore provides all
-information required for regional quantification; a separate brain mask is not
-needed. Set `region_id_space` to the ID namespace actually stored in the
-annotation.
-
-Semantic segmentation or fractional-occupancy maps on the annotation grid use
-the parallel regional quantifier:
-
-```python
-from spatialsignal.quantification import quantify_signal_by_region
-
-damage = load_label_volume(
-    Path("subject_001_damage_mask.nii.gz"),
-    space_name=annotation.space.space_name,
-)
-damage_result = quantify_signal_by_region(
-    damage,
-    annotation,
-    hemisphere=hemisphere,
-    region_id_space="kimlab16bit",
-    output_csv=Path("outputs/subject_001_damage_by_region.csv"),
-)
-```
-
-Signal values must lie in `[0, 1]`. For a binary map,
-`*_signal_voxel_equivalents` is the signal voxel count; fractional maps are
-integrated as partial voxel occupancy. Each scope reports its region voxels and
-volume, signal voxel equivalents and volume, and signal fraction. Project-specific
-eligibility rules such as erosion or ventricle exclusion belong in construction of
-the final input map, not in `quantify_signal_by_region`.
-
-See the [workflow guide](docs/workflow.md) and
-[region-quantification example](examples/quantify_objects_by_region.py) for the
-alternative registration-folder-to-region-report workflow, which discovers the
-annotation path from an `atlasspace` output folder.
-
-### Automatic quantification QC
-
-When quantification outputs are written, the QC PNG is generated automatically.
-The plotting helper remains available when regenerating QC from an in-memory or
-previously saved assigned-object dataset:
-
-```python
-from spatialsignal.quantification import write_region_quantification_qc
-
-qc_path = write_region_quantification_qc(
-    result,
-    annotation,
-    Path("outputs/subject_001_quantification_qc_review.png"),
-)
-print(qc_path)
-```
-
-The PNG contains three whole-volume point-count projections with the annotation
-outline, plus three representative annotation slices with regional boundaries
-and assigned points. Background-assigned objects are highlighted in red on the
-slice panels, where their depth is unambiguous. A summary reports assigned,
-background, and out-of-bounds percentages. The projections accumulate directly
-into 2D histograms, so this does not create a dense 3D count map.
-
-## Packaged templates
-
-Canonical starter TOMLs live in the installable package under
-`spatialsignal.config_templates`.
-
-Scaffold a local config through the Python API:
-
-```python
-from pathlib import Path
-
-from spatialsignal.config_templates import scaffold_template
-
-scaffold_template("build_pointcloud", Path("build_pointcloud_local.toml"))
-```
-
-Starter templates currently include:
-
-- `build_pointcloud`
-- `build_signal_points`
-- `colocalization`
-- `voxelize_signal_masks`
-
-Starter configs use zero-based indexing, explicit `[space]` metadata, and
-single-quoted Windows paths.
-
-## Example runners
-
-Runnable wrappers in `examples/` demonstrate local-file and config-driven use:
-
-- `examples/build_pointcloud.py`
-- `examples/build_signal_points.py`
-- `examples/colocalize_pointclouds.py`
-- `examples/deduplicate_across_planes.py`
-- `examples/quantify_objects_by_region.py`
-- `examples/test_python_workflow.py`
-- `examples/test_region_quantification_workflow.py`
-- `examples/validate_against_matlab.py`
-- `examples/validate_pointcloud_dataset.py`
-- `examples/voxelize_pointcloud.py`
-- `examples/voxelize_signal_masks.py`
-- `examples/scaffold_config.py`
-
-These are convenience wrappers and testing helpers rather than the canonical
-package interface.
-
-## Documentation
-
-- [Workflow guide](docs/workflow.md): supported workflows and package boundaries
-- [Coordinate systems](docs/coordinate_systems.md): coordinate conventions and map semantics
-- [Legacy MATLAB relationship](docs/legacy_matlab_relationship.md): compatibility notes
-- [Roadmap](docs/roadmap.md): internal development status and planned work
-
-## Repository layout
-
-```text
-src/        Reusable package code
-src/spatialsignal/config_templates/  Canonical packaged starter TOMLs
-examples/   Example wrappers and API-usage patterns
-docs/       User-facing and planning documentation
-tests/      Unit tests
-```
+If you use `spatialsignal` in research, cite the software using the metadata in
+[`CITATION.cff`](CITATION.cff). Citation metadata can be expanded with a DOI
+after the first archived release.
 
 ## License
 
-This project is released under the terms of the [LICENSE](LICENSE).
+`spatialsignal` is distributed under the
+[GNU General Public License v3.0](LICENSE) (`GPL-3.0-only`).

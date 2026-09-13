@@ -1,4 +1,4 @@
-"""Tools for building spatial cell point clouds from LSFM segmentation outputs."""
+"""Spatial representations and quantification for segmented microscopy data."""
 
 __all__ = ["__version__"]
 
