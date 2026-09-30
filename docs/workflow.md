@@ -30,7 +30,17 @@ The Parquet table contains coordinates, area, major and minor axis lengths,
 and eccentricity for each 2D detection. The JSON sidecar records the spatial
 grid, indexing convention, representation type, and provenance.
 
-### 2. Deduplicate detections across planes
+### 2. Optionally filter detections by calibrated area
+
+`filter_detections_by_area()` applies an inclusive physical-area upper limit
+using each dataset's named x/y resolutions. It returns independent accepted
+and rejected `PointCloudDataset` populations, adds `area_um2`, preserves source
+detection IDs, and never modifies the input dataset. Use
+`save_pointcloud_dataset()` to persist either population when it is useful as a
+standalone artifact; otherwise the accepted population can pass directly to
+the next operation in memory.
+
+### 3. Deduplicate detections across planes
 
 `deduplicate_across_planes()` links nearby detections in adjacent planes and
 aggregates them into biological objects. `save_deduplication_outputs()` writes:
@@ -71,7 +81,7 @@ relationships. Ordinary relationships are one-to-one. One-to-many or
 many-to-many relationships are retained and explicitly classified for QC; the
 package does not silently discard or force-resolve them.
 
-### 3. Quantify objects by region
+### 4. Quantify objects by region
 
 The registration integration layer consumes the canonical
 `registration_result.json` in an `atlasspace` output folder and exposes its
@@ -142,7 +152,7 @@ The detailed report remains the canonical base result. Child-region densities
 are never averaged, and child-region medians are never combined to approximate
 parent morphology.
 
-### 4. Create a subject-space count map
+### 5. Create a subject-space count map
 
 `voxelize_to_space()` aggregates deduplicated object centroids onto a declared
 subject analysis grid. Count maps are the canonical stored subject-level voxel

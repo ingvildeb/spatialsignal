@@ -24,16 +24,18 @@ analysis workflows.
 ```mermaid
 flowchart LR
     A[Labeled instance masks] --> B[Centroid point cloud]
-    B --> C[Cross-plane deduplication]
-    C --> D[Subject-space count map]
-    C --> E[Atlas-region summaries]
-    F[Binary semantic masks] --> G[Subject-space fraction map]
-    G --> H[Atlas-region summaries]
+    B --> C[Optional calibrated detection QC]
+    C --> D[Cross-plane deduplication]
+    D --> E[Subject-space count map]
+    D --> F[Atlas-region summaries]
+    G[Binary semantic masks] --> H[Subject-space fraction map]
+    H --> I[Atlas-region summaries]
 ```
 
 Current capabilities include:
 
 - centroid extraction from labeled 2D instance-mask stacks;
+- immutable calibrated-area filtering with accepted and rejected populations;
 - dense signal-support extraction from binary semantic masks;
 - cross-plane deduplication with auditable membership and edge tables;
 - exact-plane, one-to-one colocalization between centroid point clouds;
@@ -115,9 +117,12 @@ Load the table and its sidecar together, then merge plausible detections from
 adjacent planes:
 
 ```python
-from spatialsignal.io import save_deduplication_outputs
+from spatialsignal.io import save_deduplication_outputs, save_pointcloud_dataset
 from spatialsignal.models import PointCloudDataset
-from spatialsignal.pointcloud import deduplicate_across_planes
+from spatialsignal.pointcloud import (
+    deduplicate_across_planes,
+    filter_detections_by_area,
+)
 
 dataset = PointCloudDataset.from_files(
     table_path=Path("outputs/subject_001_pointcloud.parquet"),
@@ -125,14 +130,32 @@ dataset = PointCloudDataset.from_files(
 )
 dataset.validate()
 
+filtered = filter_detections_by_area(
+    dataset,
+    maximum_area_um2=500.0,
+    source_name="subject_001_pointcloud.parquet",
+)
+
+# Persist either population only when it is useful as a standalone dataset.
+save_pointcloud_dataset(
+    filtered.rejected,
+    Path("outputs/subject_001_rejected.parquet"),
+    Path("outputs/subject_001_rejected_space.json"),
+)
+
 result = deduplicate_across_planes(
-    dataset.points,
-    dataset.space,
+    filtered.accepted.points,
+    filtered.accepted.space,
     max_plane_offset=1,
     max_xy_distance_um=3.0,
     max_n_planes=2,
 )
-save_deduplication_outputs(dataset, result, Path("outputs"))
+save_deduplication_outputs(
+    filtered.accepted,
+    result,
+    Path("outputs"),
+    parameters={"detection_area_filter": filtered.summary},
+)
 ```
 
 Use `max_workers=1` in notebooks and other interactive sessions. On Windows,

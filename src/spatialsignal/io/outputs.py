@@ -52,6 +52,14 @@ class DeduplicationOutputPaths:
 
 
 @dataclass(frozen=True)
+class PointCloudOutputPaths:
+    """Paths written for a point-cloud dataset and its metadata sidecar."""
+
+    table_path: Path
+    metadata_path: Path
+
+
+@dataclass(frozen=True)
 class ColocalizationOutputPaths:
     """Paths written for saved colocalization evidence and QC."""
 
@@ -80,6 +88,26 @@ def make_subject_output_stem(subject_name: str) -> str:
     if not normalized:
         raise ValueError("subject_name must contain at least one alphanumeric character")
     return normalized
+
+
+def save_pointcloud_dataset(
+    dataset: PointCloudDataset,
+    table_path: Path,
+    metadata_path: Path,
+) -> PointCloudOutputPaths:
+    """Save a point-cloud table and its matching spatial metadata explicitly."""
+
+    dataset.validate_spatial_points()
+    table_path = Path(table_path)
+    metadata_path = Path(metadata_path)
+    table_path.parent.mkdir(parents=True, exist_ok=True)
+    metadata_path.parent.mkdir(parents=True, exist_ok=True)
+    dataset.points.to_parquet(table_path, index=False)
+    dataset.metadata.to_json(metadata_path)
+    return PointCloudOutputPaths(
+        table_path=table_path,
+        metadata_path=metadata_path,
+    )
 
 
 def write_nifti_voxel_map(
