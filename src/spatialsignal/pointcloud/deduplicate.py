@@ -57,13 +57,13 @@ class DeduplicationResult:
 
 
 def summarize_deduplication_result(
-    raw_points: pd.DataFrame,
+    input_points: pd.DataFrame,
     result: DeduplicationResult,
 ) -> dict[str, int]:
     """Return a compact summary of deduplication outputs."""
 
     return {
-        "raw_detections": int(len(raw_points)),
+        "input_detections": int(len(input_points)),
         "cleaned_objects": int(len(result.objects)),
         "accepted_edges": int(len(result.edges)),
     }

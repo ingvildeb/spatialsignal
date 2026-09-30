@@ -402,7 +402,7 @@ def test_summarize_deduplication_result_reports_minimal_counts() -> None:
     summary = summarize_deduplication_result(points, result)
 
     assert summary == {
-        "raw_detections": 2,
+        "input_detections": 2,
         "cleaned_objects": 1,
         "accepted_edges": 1,
     }

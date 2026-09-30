@@ -274,7 +274,7 @@ def test_dataset_metadata_round_trip_json(tmp_path: Path) -> None:
         processing=ProcessingProvenance(
             stage="deduplicate_across_planes",
             parameters={"max_plane_offset": 1, "max_xy_distance_um": 3.0, "max_n_planes": 2},
-            summary={"raw_detections": 10, "cleaned_objects": 8, "accepted_edges": 2},
+            summary={"input_detections": 10, "cleaned_objects": 8, "accepted_edges": 2},
         ),
     )
 
