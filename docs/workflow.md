@@ -30,15 +30,30 @@ The Parquet table contains coordinates, area, major and minor axis lengths,
 and eccentricity for each 2D detection. The JSON sidecar records the spatial
 grid, indexing convention, representation type, and provenance.
 
-### 2. Optionally filter detections by calibrated area
+### 2. Optionally filter detections by calibrated morphology
 
-`filter_detections_by_area()` applies an inclusive physical-area upper limit
-using each dataset's named x/y resolutions. It returns independent accepted
-and rejected `PointCloudDataset` populations, adds `area_um2`, preserves source
-detection IDs, and never modifies the input dataset. Use
-`save_pointcloud_dataset()` to persist either population when it is useful as a
-standalone artifact; otherwise the accepted population can pass directly to
-the next operation in memory.
+`filter_detections_by_morphology()` applies one auditable QC rule before
+cross-plane deduplication. A detection is rejected when its calibrated physical
+area is above the hard threshold, or when it is above an explicitly configured
+conditional area threshold and its numeric feature conditions match. Both area
+comparisons use strict `>` boundaries, so equality alone does not trigger either
+area test. Conditions have no defaults and are inactive unless both a
+conditional threshold and a nonempty condition list are supplied.
+
+Each condition records a feature column, comparison operator, and threshold.
+`condition_combination="any"` joins multiple conditions with OR; `"all"` joins
+them with AND. The hard area threshold remains independent of this choice. The
+area-only `filter_detections_by_area()` convenience function delegates to the
+same implementation.
+
+The operation returns independent accepted and rejected `PointCloudDataset`
+populations, adds `area_um2`, preserves source detection IDs, assigns one
+mutually exclusive `rejection_reason` to every rejected detection, and never
+modifies the input dataset. Its provenance records both thresholds, the full
+condition expression, and counts by rejection reason. Use
+`save_pointcloud_dataset()` to persist either population when useful as a
+standalone artifact; otherwise pass the accepted population directly to the
+next operation in memory.
 
 ### 3. Deduplicate detections across planes
 

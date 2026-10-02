@@ -35,11 +35,13 @@ flowchart LR
 Current capabilities include:
 
 - centroid extraction from labeled 2D instance-mask stacks;
-- immutable calibrated-area filtering with accepted and rejected populations;
+- immutable calibrated morphology filtering with reason-coded accepted and
+  rejected populations;
 - dense signal-support extraction from binary semantic masks;
 - cross-plane deduplication with auditable membership and edge tables;
 - exact-plane, one-to-one colocalization between centroid point clouds;
 - count, density, and fractional-occupancy maps in subject space;
+- registration-aware point transformation and unmodulated reference-grid count maps;
 - atlas-region assignment and bilateral or hemisphere-aware summaries;
 - area and eccentricity summaries for 2D instance detections;
 - optional atlas hierarchy rollups through
@@ -53,6 +55,12 @@ available, install directly from GitHub:
 
 ```bash
 python -m pip install "spatialsignal @ git+https://github.com/ingvildeb/spatialsignal.git@main"
+```
+
+Install the registration extra when transforming point clouds with AtlasSpace:
+
+```bash
+python -m pip install "spatialsignal[registration] @ git+https://github.com/ingvildeb/spatialsignal.git@v0.1.1"
 ```
 
 For local development:
@@ -120,8 +128,9 @@ adjacent planes:
 from spatialsignal.io import save_deduplication_outputs, save_pointcloud_dataset
 from spatialsignal.models import PointCloudDataset
 from spatialsignal.pointcloud import (
+    DetectionFilterCondition,
     deduplicate_across_planes,
-    filter_detections_by_area,
+    filter_detections_by_morphology,
 )
 
 dataset = PointCloudDataset.from_files(
@@ -130,9 +139,17 @@ dataset = PointCloudDataset.from_files(
 )
 dataset.validate()
 
-filtered = filter_detections_by_area(
+filtered = filter_detections_by_morphology(
     dataset,
-    maximum_area_um2=500.0,
+    hard_area_threshold_um2=1200.0,
+    conditional_area_threshold_um2=800.0,
+    conditions=[
+        DetectionFilterCondition(
+            feature="eccentricity",
+            operator=">=",
+            threshold=0.965,
+        )
+    ],
     source_name="subject_001_pointcloud.parquet",
 )
 
@@ -154,9 +171,15 @@ save_deduplication_outputs(
     filtered.accepted,
     result,
     Path("outputs"),
-    parameters={"detection_area_filter": filtered.summary},
+    parameters={"detection_morphology_filter": filtered.summary},
 )
 ```
+
+Omit both `conditional_area_threshold_um2` and `conditions` for a hard-area-only
+rule. Conditions are never enabled implicitly. When several are supplied,
+`condition_combination="any"` rejects when any condition matches, while
+`"all"` requires every condition to match. The hard threshold always applies
+independently.
 
 Use `max_workers=1` in notebooks and other interactive sessions. On Windows,
 calls with `max_workers > 1` must run under `if __name__ == "__main__":`.

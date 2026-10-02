@@ -23,7 +23,15 @@ from .signal_points import (
     extract_signal_points_from_mask,
     extract_signal_points_from_mask_stack,
 )
-from .filtering import DetectionAreaFilterResult, filter_detections_by_area
+from .filtering import (
+    CONDITIONAL_REJECTION_REASON,
+    HARD_AREA_REJECTION_REASON,
+    DetectionAreaFilterResult,
+    DetectionFilterCondition,
+    DetectionMorphologyFilterResult,
+    filter_detections_by_area,
+    filter_detections_by_morphology,
+)
 from spatialsignal.models.datasets import PointCloudDataset
 from .deduplicate import (
     CLEANED_OBJECT_REQUIRED_COLUMNS,
@@ -67,6 +75,8 @@ __all__ = [
     "ColocalizationResult",
     "DeduplicationResult",
     "DetectionAreaFilterResult",
+    "DetectionFilterCondition",
+    "DetectionMorphologyFilterResult",
     "EDGE_COLUMNS",
     "MATCH_COLUMNS",
     "OBJECT_RELATIONSHIP_COLUMNS",
@@ -84,6 +94,9 @@ __all__ = [
     "extract_signal_points_from_mask",
     "extract_signal_points_from_mask_stack",
     "filter_detections_by_area",
+    "filter_detections_by_morphology",
+    "HARD_AREA_REJECTION_REASON",
+    "CONDITIONAL_REJECTION_REASON",
     "load_canonical_pointcloud_csv",
     "load_legacy_matlab_centroids_csv",
     "map_detection_matches_to_objects",
