@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "spatialsignal"
-version = "0.1.0"
+version = "0.1.1"
 description = "Spatial point-cloud and mapping toolkit for whole-brain segmented cells"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -51,6 +51,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+registration = [
+  "atlasspace @ git+https://github.com/ingvildeb/atlasspace.git@v0.2.1",
+]
 dev = [
   "build>=1.2",
   "pytest>=8.0",

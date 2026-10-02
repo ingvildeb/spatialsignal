@@ -162,6 +162,28 @@ def load_label_volume(
     return LabelVolume(path=path, data=data, space=space)
 
 
+def load_nifti_space(
+    path: Path,
+    *,
+    space_name: str | None = None,
+    indexing: str = "zero_based",
+) -> SpaceDefinition:
+    """Read only NIfTI header geometry into an exact spatial definition."""
+
+    path = Path(path)
+    image = nib.load(str(path))
+    shape = tuple(int(value) for value in image.shape)
+    if len(shape) != 3:
+        raise ValueError(f"Expected a 3D NIfTI image at {path}, got shape {shape}")
+    resolved_space_name = space_name if space_name is not None else _nifti_stem(path)
+    return _space_from_nifti_image(
+        image,
+        shape,
+        space_name=resolved_space_name,
+        indexing=indexing,
+    )
+
+
 def _nifti_stem(path: Path) -> str:
     """Return a filename without a single or compressed NIfTI suffix."""
 

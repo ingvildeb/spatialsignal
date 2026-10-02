@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 
@@ -30,6 +31,8 @@ def voxelize_point_centroids_to_count_map(
     target_space: SpaceDefinition,
     *,
     subject_name: str | None = None,
+    source_name: str | None = None,
+    processing_parameters: dict[str, Any] | None = None,
 ) -> VoxelMap:
     """Aggregate centroid points into a target voxel grid as counts."""
 
@@ -40,6 +43,12 @@ def voxelize_point_centroids_to_count_map(
     kept_xyz, keep_mask = filter_in_bounds_target_indices(mapped_xyz, target_space)
     grid = accumulate_count_map(kept_xyz, target_space)
 
+    parameters = {
+        "source_kind": dataset.metadata.representation.kind,
+        "source_representation_type": dataset.metadata.representation.representation_type,
+        "target_space_name": target_space.space_name,
+    }
+    parameters.update(processing_parameters or {})
     metadata = DatasetMetadata(
         schema_name="spatialsignal.dataset_metadata",
         schema_version="0.1.0",
@@ -51,12 +60,8 @@ def voxelize_point_centroids_to_count_map(
         ),
         processing=ProcessingProvenance(
             stage="voxelize_to_space",
-            source_name=dataset.subject_name,
-            parameters={
-                "source_kind": dataset.metadata.representation.kind,
-                "source_representation_type": dataset.metadata.representation.representation_type,
-                "target_space_name": target_space.space_name,
-            },
+            source_name=source_name or dataset.subject_name,
+            parameters=parameters,
             summary={
                 "input_points": int(len(dataset.points)),
                 "kept_points": int(keep_mask.sum()),
@@ -79,6 +84,8 @@ def voxelize_to_space(
     target_space: SpaceDefinition,
     *,
     subject_name: str | None = None,
+    source_name: str | None = None,
+    processing_parameters: dict[str, Any] | None = None,
 ) -> VoxelMap:
     """Voxelize a point-based dataset into a target space."""
 
@@ -93,6 +100,8 @@ def voxelize_to_space(
             dataset,
             target_space,
             subject_name=subject_name,
+            source_name=source_name,
+            processing_parameters=processing_parameters,
         )
 
     raise NotImplementedError(
