@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import numpy as np
 
-from spatialsignal.integration.registration import LabelVolume
 from spatialsignal.models import SpaceDefinition
+
+if TYPE_CHECKING:
+    from spatialsignal.integration.registration import LabelVolume
 
 
 LEFT_HEMISPHERE_ID = 1

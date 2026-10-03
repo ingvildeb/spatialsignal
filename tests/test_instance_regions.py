@@ -1,5 +1,8 @@
 """Tests for instance-based region quantification."""
 
+import subprocess
+import sys
+
 import numpy as np
 import pandas as pd
 
@@ -9,6 +12,17 @@ from spatialsignal.quantification import (
     summarize_objects_by_hierarchy_level,
     summarize_objects_by_region,
 )
+
+
+def test_quantification_imports_in_fresh_interpreter() -> None:
+    result = subprocess.run(
+        [sys.executable, "-c", "import spatialsignal.quantification"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
 
 
 def test_region_summary_reports_median_object_area_in_square_microns() -> None:
