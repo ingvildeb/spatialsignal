@@ -9,6 +9,7 @@ from spatialsignal.models import (
 )
 from spatialsignal.pointcloud import (
     MATCH_COLUMNS,
+    collapse_colocalized_object_components,
     map_detection_matches_to_objects,
     match_colocalized_detections,
 )
@@ -241,3 +242,56 @@ def test_object_mapping_requires_membership_for_every_detection() -> None:
             pd.DataFrame([{"object_id": 1, "detection_id": 999}]),
             pd.DataFrame([{"object_id": 2, "detection_id": 11}]),
         )
+
+
+def test_collapse_colocalized_components_materializes_unique_events() -> None:
+    dataset_a = _dataset("subject", [])
+    dataset_b = _dataset("subject", [])
+    for dataset, rows in (
+        (
+            dataset_a,
+            [
+                {"object_id": 1, "x": 10, "y": 10, "z": 0},
+                {"object_id": 2, "x": 12, "y": 10, "z": 0},
+            ],
+        ),
+        (
+            dataset_b,
+            [{"object_id": 10, "x": 11, "y": 10, "z": 0}],
+        ),
+    ):
+        dataset.points = pd.DataFrame(rows)
+        dataset.metadata.representation = DataRepresentation(
+            kind="point_cloud", representation_type="cleaned_objects"
+        )
+    relationships = pd.DataFrame(
+        [
+            {
+                "a_object_id": 1,
+                "b_object_id": 10,
+                "relationship_status": "multiple_a_to_one_b",
+            },
+            {
+                "a_object_id": 2,
+                "b_object_id": 10,
+                "relationship_status": "multiple_a_to_one_b",
+            },
+        ]
+    )
+
+    result = collapse_colocalized_object_components(
+        dataset_a,
+        dataset_b,
+        relationships,
+        population_id="a__b",
+        channel_a="a",
+        channel_b="b",
+    )
+
+    assert len(result.points) == 1
+    assert result.points.loc[0, "a_object_ids"] == [1, 2]
+    assert result.points.loc[0, "b_object_ids"] == [10]
+    assert result.points.loc[0, "x"] == 11
+    assert result.points.loc[0, "relationship_status"] == "multiple_a_to_one_b"
+    assert result.metadata.processing is not None
+    assert result.metadata.processing.stage == "collapse_colocalized_object_components"

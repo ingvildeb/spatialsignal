@@ -40,6 +40,7 @@ Current capabilities include:
 - dense signal-support extraction from binary semantic masks;
 - cross-plane deduplication with auditable membership and edge tables;
 - exact-plane, one-to-one colocalization between centroid point clouds;
+- materialization of related cross-channel objects as unique colocalized events;
 - count, density, and fractional-occupancy maps in subject space;
 - registration-aware point transformation and unmodulated reference-grid count maps;
 - atlas-region assignment and bilateral or hemisphere-aware summaries;
@@ -50,17 +51,17 @@ Current capabilities include:
 
 ## Installation
 
-`spatialsignal` requires Python 3.10 or newer. Until a PyPI release is
-available, install directly from GitHub:
+`spatialsignal` requires Python 3.10 or newer. Install the tagged release
+directly from GitHub:
 
 ```bash
-python -m pip install "spatialsignal @ git+https://github.com/ingvildeb/spatialsignal.git@main"
+python -m pip install "spatialsignal @ git+https://github.com/ingvildeb/spatialsignal.git@v0.2.0"
 ```
 
 Install the registration extra when transforming point clouds with AtlasSpace:
 
 ```bash
-python -m pip install "spatialsignal[registration] @ git+https://github.com/ingvildeb/spatialsignal.git@v0.1.1"
+python -m pip install "spatialsignal[registration] @ git+https://github.com/ingvildeb/spatialsignal.git@v0.2.0"
 ```
 
 For local development:

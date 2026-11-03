@@ -15,6 +15,7 @@ from .colocalization import (
     PLANE_SUMMARY_COLUMNS,
     ColocalizationResult,
     ObjectRelationshipResult,
+    collapse_colocalized_object_components,
     map_detection_matches_to_objects,
     match_colocalized_detections,
 )
@@ -88,6 +89,7 @@ __all__ = [
     "build_cross_plane_edge_table",
     "build_object_membership_table",
     "compare_pointcloud_tables",
+    "collapse_colocalized_object_components",
     "deduplicate_across_planes",
     "extract_centroids_from_mask",
     "extract_centroids_from_mask_stack",

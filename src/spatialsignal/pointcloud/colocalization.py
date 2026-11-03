@@ -2,14 +2,21 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections import defaultdict
+from dataclasses import dataclass, replace
+from typing import Any
 
 import numpy as np
 import pandas as pd
 from scipy.optimize import linear_sum_assignment
 from scipy.spatial import cKDTree
 
-from spatialsignal.models import PointCloudDataset, SpaceDefinition
+from spatialsignal.models import (
+    DataRepresentation,
+    PointCloudDataset,
+    ProcessingProvenance,
+    SpaceDefinition,
+)
 
 
 MATCH_COLUMNS = [
@@ -67,6 +74,145 @@ class ObjectRelationshipResult:
     """Detection-level evidence lifted to deduplicated object relationships."""
 
     relationships: pd.DataFrame
+
+
+def collapse_colocalized_object_components(
+    dataset_a: PointCloudDataset,
+    dataset_b: PointCloudDataset,
+    relationships: pd.DataFrame,
+    *,
+    population_id: str,
+    channel_a: str,
+    channel_b: str,
+    component_rule: str = "bipartite_connected_component",
+    coordinate_rule: str = "component_mean_object_centroid",
+    source_name: str | None = None,
+    processing_parameters: dict[str, Any] | None = None,
+) -> PointCloudDataset:
+    """Collapse related channel objects into unique colocalized events."""
+
+    if component_rule != "bipartite_connected_component":
+        raise ValueError(f"Unsupported component_rule: {component_rule!r}")
+    if coordinate_rule != "component_mean_object_centroid":
+        raise ValueError(f"Unsupported coordinate_rule: {coordinate_rule!r}")
+    if dataset_a.subject_name != dataset_b.subject_name:
+        raise ValueError("Channel object datasets must have the same subject_name")
+    for label, dataset in (("A", dataset_a), ("B", dataset_b)):
+        dataset.validate_spatial_points()
+        representation = dataset.metadata.representation
+        if (
+            representation.kind != "point_cloud"
+            or representation.representation_type != "cleaned_objects"
+        ):
+            raise ValueError(f"Dataset {label} must contain cleaned objects")
+        _require_columns(dataset.points, ["object_id", "x", "y", "z"], label)
+        if dataset.points["object_id"].duplicated().any():
+            raise ValueError(f"Dataset {label} object_id values must be unique")
+    _validate_compatible_spaces(dataset_a.space, dataset_b.space)
+    _require_columns(
+        relationships,
+        ["a_object_id", "b_object_id", "relationship_status"],
+        "relationships",
+    )
+    if relationships[["a_object_id", "b_object_id"]].duplicated().any():
+        raise ValueError("Relationship table contains duplicate object pairs")
+
+    a_objects = dataset_a.points.set_index("object_id", drop=False)
+    b_objects = dataset_b.points.set_index("object_id", drop=False)
+    parent: dict[tuple[str, int], tuple[str, int]] = {}
+
+    def find(node: tuple[str, int]) -> tuple[str, int]:
+        parent.setdefault(node, node)
+        while parent[node] != node:
+            parent[node] = parent[parent[node]]
+            node = parent[node]
+        return node
+
+    def union(first: tuple[str, int], second: tuple[str, int]) -> None:
+        first_root = find(first)
+        second_root = find(second)
+        if first_root != second_root:
+            parent[second_root] = first_root
+
+    for row in relationships.itertuples(index=False):
+        a_id = int(row.a_object_id)
+        b_id = int(row.b_object_id)
+        if a_id not in a_objects.index or b_id not in b_objects.index:
+            raise ValueError("Relationship references an unknown channel object ID")
+        union(("a", a_id), ("b", b_id))
+
+    components: dict[tuple[str, int], dict[str, list[int]]] = defaultdict(
+        lambda: {"a": [], "b": []}
+    )
+    for node in parent:
+        components[find(node)][node[0]].append(node[1])
+    relationship_counts: dict[tuple[str, int], int] = defaultdict(int)
+    for row in relationships.itertuples(index=False):
+        relationship_counts[find(("a", int(row.a_object_id)))] += 1
+
+    ordered = sorted(
+        components.items(),
+        key=lambda item: (min(item[1]["a"]), min(item[1]["b"])),
+    )
+    rows: list[dict[str, Any]] = []
+    for object_id, (root, members) in enumerate(ordered):
+        a_ids = sorted(members["a"])
+        b_ids = sorted(members["b"])
+        combined = pd.concat([a_objects.loc[a_ids], b_objects.loc[b_ids]])
+        coordinates: dict[str, float] = {}
+        for axis in ("x", "y", "z"):
+            float_column = f"{axis}_float"
+            source = float_column if float_column in combined.columns else axis
+            coordinates[float_column] = float(combined[source].astype(float).mean())
+        rows.append(
+            {
+                "object_id": object_id,
+                "x": int(np.rint(coordinates["x_float"])),
+                "y": int(np.rint(coordinates["y_float"])),
+                "z": int(np.rint(coordinates["z_float"])),
+                **coordinates,
+                "n_a_objects": len(a_ids),
+                "n_b_objects": len(b_ids),
+                "n_relationships": relationship_counts[root],
+                "relationship_status": _component_status(len(a_ids), len(b_ids)),
+                "a_object_ids": a_ids,
+                "b_object_ids": b_ids,
+            }
+        )
+    columns = [
+        "object_id", "x", "y", "z", "x_float", "y_float", "z_float",
+        "n_a_objects", "n_b_objects", "n_relationships",
+        "relationship_status", "a_object_ids", "b_object_ids",
+    ]
+    points = pd.DataFrame(rows, columns=columns)
+    parameters = {
+        "population_id": population_id,
+        "channel_a": channel_a,
+        "channel_b": channel_b,
+        "component_rule": component_rule,
+        "coordinate_rule": coordinate_rule,
+    }
+    parameters.update(processing_parameters or {})
+    metadata = replace(
+        dataset_a.metadata,
+        representation=DataRepresentation(
+            kind="point_cloud", representation_type="cleaned_objects"
+        ),
+        processing=ProcessingProvenance(
+            stage="collapse_colocalized_object_components",
+            source_name=source_name,
+            parameters=parameters,
+            summary={
+                "n_relationship_rows": int(len(relationships)),
+                "n_colocalized_objects": int(len(points)),
+                "n_a_objects": int(relationships["a_object_id"].nunique()),
+                "n_b_objects": int(relationships["b_object_id"].nunique()),
+            },
+        ),
+    )
+    result = PointCloudDataset(dataset_a.subject_name, points, metadata)
+    result.validate_spatial_points()
+    return result
 
 
 def match_colocalized_detections(
@@ -422,8 +568,13 @@ def _validate_colocalization_inputs(
         if dataset.points["detection_id"].duplicated().any():
             raise ValueError(f"Dataset {label} detection_id values must be unique")
 
-    a_space = dataset_a.space
-    b_space = dataset_b.space
+    _validate_compatible_spaces(dataset_a.space, dataset_b.space)
+
+
+def _validate_compatible_spaces(
+    a_space: SpaceDefinition,
+    b_space: SpaceDefinition,
+) -> None:
     differing = []
     for field in ("orientation", "axis_labels", "indexing", "units", "shape"):
         if getattr(a_space, field) != getattr(b_space, field):
@@ -435,6 +586,16 @@ def _validate_colocalization_inputs(
             "Point clouds occupy incompatible spaces; differing fields: "
             + ", ".join(differing)
         )
+
+
+def _component_status(n_a: int, n_b: int) -> str:
+    if n_a == 1 and n_b == 1:
+        return "one_to_one"
+    if n_a > 1 and n_b == 1:
+        return "multiple_a_to_one_b"
+    if n_a == 1 and n_b > 1:
+        return "one_a_to_multiple_b"
+    return "many_to_many"
 
 
 def _declared_z_indices(space: SpaceDefinition) -> range:
