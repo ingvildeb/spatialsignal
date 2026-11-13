@@ -122,6 +122,54 @@ class DataRepresentation:
 
 
 @dataclass
+class ArtifactReference:
+    """Optional reference to one logical upstream artifact.
+
+    The referenced artifact may be a SpatialSignal dataset or an artifact
+    owned by another metadata schema. Paths and filesystem timestamps are
+    deliberately excluded from artifact identity.
+    """
+
+    role: str
+    artifact_id: str
+    schema_name: str | None = None
+    name: str | None = None
+
+    def __post_init__(self) -> None:
+        for field_name in ("role", "artifact_id"):
+            value = getattr(self, field_name)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{field_name} must be a non-empty string")
+        for field_name in ("schema_name", "name"):
+            value = getattr(self, field_name)
+            if value is not None and (
+                not isinstance(value, str) or not value.strip()
+            ):
+                raise ValueError(
+                    f"{field_name} must be a non-empty string when provided"
+                )
+
+    def to_dict(self) -> dict[str, str]:
+        data = {"role": self.role, "artifact_id": self.artifact_id}
+        if self.schema_name is not None:
+            data["schema_name"] = self.schema_name
+        if self.name is not None:
+            data["name"] = self.name
+        return data
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "ArtifactReference":
+        if not isinstance(data, dict):
+            raise ValueError("artifact reference must be an object")
+        return cls(
+            role=data["role"],
+            artifact_id=data["artifact_id"],
+            schema_name=data.get("schema_name"),
+            name=data.get("name"),
+        )
+
+
+@dataclass
 class ProcessingProvenance:
     """Provenance describing how a spatial dataset was produced."""
 
@@ -129,6 +177,7 @@ class ProcessingProvenance:
     source_name: str | None = None
     parameters: dict[str, Any] | None = None
     summary: dict[str, Any] | None = None
+    inputs: list[ArtifactReference] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Convert provenance to a plain dictionary."""
@@ -140,6 +189,8 @@ class ProcessingProvenance:
             data["parameters"] = self.parameters
         if self.summary is not None:
             data["summary"] = self.summary
+        if self.inputs is not None:
+            data["inputs"] = [item.to_dict() for item in self.inputs]
         return data
 
     @classmethod
@@ -151,6 +202,11 @@ class ProcessingProvenance:
             source_name=data.get("source_name"),
             parameters=data.get("parameters"),
             summary=data.get("summary"),
+            inputs=(
+                [ArtifactReference.from_dict(item) for item in data["inputs"]]
+                if "inputs" in data
+                else None
+            ),
         )
 
 
@@ -163,6 +219,15 @@ class DatasetMetadata:
     space: SpaceDefinition
     representation: DataRepresentation
     processing: ProcessingProvenance | None = None
+    artifact_id: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.artifact_id is not None and (
+            not isinstance(self.artifact_id, str) or not self.artifact_id.strip()
+        ):
+            raise ValueError(
+                "artifact_id must be a non-empty string when provided"
+            )
 
     def to_dict(self) -> dict[str, Any]:
         """Convert dataset metadata to the JSON sidecar structure."""
@@ -170,9 +235,11 @@ class DatasetMetadata:
         data: dict[str, Any] = {
             "schema_name": self.schema_name,
             "schema_version": self.schema_version,
-            "space": self.space.to_dict(),
-            "representation": self.representation.to_dict(),
         }
+        if self.artifact_id is not None:
+            data["artifact_id"] = self.artifact_id
+        data["space"] = self.space.to_dict()
+        data["representation"] = self.representation.to_dict()
         if self.processing is not None:
             data["processing"] = self.processing.to_dict()
         return data
@@ -199,6 +266,7 @@ class DatasetMetadata:
                 if "processing" in data
                 else None
             ),
+            artifact_id=data.get("artifact_id"),
         )
 
     @classmethod

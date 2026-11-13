@@ -55,13 +55,13 @@ Current capabilities include:
 directly from GitHub:
 
 ```bash
-python -m pip install "spatialsignal @ git+https://github.com/ingvildeb/spatialsignal.git@v0.2.0"
+python -m pip install "spatialsignal @ git+https://github.com/ingvildeb/spatialsignal.git@v0.2.1"
 ```
 
 Install the registration extra when transforming point clouds with AtlasSpace:
 
 ```bash
-python -m pip install "spatialsignal[registration] @ git+https://github.com/ingvildeb/spatialsignal.git@v0.2.0"
+python -m pip install "spatialsignal[registration] @ git+https://github.com/ingvildeb/spatialsignal.git@v0.2.1"
 ```
 
 For local development:

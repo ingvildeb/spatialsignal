@@ -2,6 +2,7 @@
 
 from .datasets import PointCloudDataset, VoxelMap
 from .metadata import (
+    ArtifactReference,
     DataRepresentation,
     DatasetMetadata,
     ProcessingProvenance,
@@ -11,6 +12,7 @@ from .metadata import (
 )
 
 __all__ = [
+    "ArtifactReference",
     "DataRepresentation",
     "DatasetMetadata",
     "PointCloudDataset",
